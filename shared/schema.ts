@@ -105,6 +105,7 @@ export const answers = pgTable("answers", {
   type: questionTypeEnum("type").notNull(),
   value: text("value"),
   isCorrect: boolean("is_correct"),
+  points: integer("points").default(0),
 });
 
 export const answersRelations = relations(answers, ({ one }) => ({

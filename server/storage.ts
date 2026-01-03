@@ -76,6 +76,8 @@ export interface IStorage {
   getAnswers(submissionId: string): Promise<Answer[]>;
   upsertAnswer(submissionId: string, questionId: string, type: "MCQ" | "TEXT", value: string): Promise<Answer>;
   updateAnswerCorrectness(answerId: string, isCorrect: boolean): Promise<Answer | undefined>;
+  updateAnswerPoints(answerId: string, points: number): Promise<Answer | undefined>;
+  recalculateManualScore(submissionId: string): Promise<Submission | undefined>;
 
   publishResults(category: Category): Promise<CompetitionSettings>;
   unpublishResults(category: Category): Promise<CompetitionSettings>;
@@ -448,6 +450,32 @@ export class DatabaseStorage implements IStorage {
       .where(eq(answers.id, answerId))
       .returning();
     return updated || undefined;
+  }
+
+  async updateAnswerPoints(answerId: string, points: number): Promise<Answer | undefined> {
+    const [updated] = await db.update(answers)
+      .set({ points })
+      .where(eq(answers.id, answerId))
+      .returning();
+    return updated || undefined;
+  }
+
+  async recalculateManualScore(submissionId: string): Promise<Submission | undefined> {
+    const submissionAnswers = await this.getAnswers(submissionId);
+    const textAnswerPoints = submissionAnswers
+      .filter((a) => a.type === "TEXT")
+      .reduce((sum, a) => sum + (a.points || 0), 0);
+
+    const submission = await this.getSubmissionById(submissionId);
+    if (!submission) return undefined;
+
+    const finalScore = (submission.autoScore || 0) + textAnswerPoints;
+
+    return this.updateSubmission(submissionId, {
+      manualScore: textAnswerPoints,
+      finalScore,
+      updatedAt: new Date(),
+    });
   }
 
   async publishResults(category: Category): Promise<CompetitionSettings> {

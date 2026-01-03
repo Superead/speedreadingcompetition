@@ -771,32 +771,45 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/admin/answers/:answerId/manual-score", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+  app.post("/api/admin/submissions/:id/recalculate", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const submission = await storage.recalculateSubmissionScores(id);
+      
+      if (!submission) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
+
+      res.json(submission);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to recalculate submission" });
+    }
+  });
+
+  app.put("/api/admin/answers/:answerId/points", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
     try {
       const { answerId } = req.params;
-      const { points, submissionId } = req.body;
+      const { points } = req.body;
 
       if (typeof points !== "number" || points < 0) {
         return res.status(400).json({ error: "Invalid points value" });
       }
 
-      const submission = await storage.getSubmissionById(submissionId);
-      if (!submission) {
-        return res.status(404).json({ error: "Submission not found" });
+      const answer = await storage.updateAnswerPoints(answerId, points);
+      if (!answer) {
+        return res.status(404).json({ error: "Answer not found" });
       }
 
-      const newManualScore = (submission.manualScore || 0) + points;
-      const newFinalScore = (submission.autoScore || 0) + newManualScore;
+      const updatedSubmission = await storage.recalculateManualScore(answer.submissionId);
 
-      await storage.updateSubmission(submissionId, { 
-        manualScore: newManualScore, 
-        finalScore: newFinalScore,
-        updatedAt: new Date(),
+      res.json({ 
+        success: true, 
+        answer,
+        manualScore: updatedSubmission?.manualScore,
+        finalScore: updatedSubmission?.finalScore
       });
-
-      res.json({ success: true, manualScore: newManualScore, finalScore: newFinalScore });
     } catch (error) {
-      res.status(500).json({ error: "Failed to update manual score" });
+      res.status(500).json({ error: "Failed to update answer points" });
     }
   });
 
