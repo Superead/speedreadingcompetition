@@ -6,14 +6,15 @@ import { z } from "zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { ArrowLeft, Loader2, BookOpen } from "lucide-react";
 
 const loginFormSchema = z.object({
-  affiliateCode: z.string().min(1, "Affiliate code is required"),
+  email: z.string().email("Valid email is required"),
+  password: z.string().min(1, "Password is required"),
 });
 
 type LoginFormData = z.infer<typeof loginFormSchema>;
@@ -26,7 +27,8 @@ export default function LoginPage() {
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
-      affiliateCode: "",
+      email: "",
+      password: "",
     },
   });
 
@@ -73,29 +75,45 @@ export default function LoginPage() {
             </div>
             <CardTitle className="text-2xl">Student Login</CardTitle>
             <CardDescription>
-              Enter your affiliate code to access your dashboard
+              Enter your email and password to access your dashboard
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
-                  name="affiliateCode"
+                  name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Affiliate Code</FormLabel>
+                      <FormLabel>Email</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Enter your code (e.g., ABC123)"
-                          className="text-center text-lg font-mono tracking-wider"
+                          type="email"
+                          placeholder="your@email.com"
                           {...field}
-                          data-testid="input-affiliate-code"
+                          data-testid="input-email"
                         />
                       </FormControl>
-                      <FormDescription>
-                        Your unique code was provided when you registered
-                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="Enter your password"
+                          {...field}
+                          data-testid="input-password"
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}

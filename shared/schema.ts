@@ -124,17 +124,20 @@ export const insertUserSchema = createInsertSchema(users).omit({
 export const registerSchema = z.object({
   name: z.string().min(1, "Name is required"),
   surname: z.string().min(1, "Surname is required"),
+  email: z.string().email("Valid email is required"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
   gender: z.enum(["male", "female", "other"]).optional(),
   birthdate: z.string().optional(),
   phone: z.string().optional(),
   city: z.string().optional(),
   country: z.string().optional(),
-  referenceCode: z.string().optional(),
+  referralCode: z.string().optional(),
   category: z.enum(["kid", "teen", "adult"]),
 });
 
 export const loginSchema = z.object({
-  affiliateCode: z.string().min(1, "Affiliate code is required"),
+  email: z.string().email("Valid email is required"),
+  password: z.string().min(1, "Password is required"),
 });
 
 export const adminLoginSchema = z.object({

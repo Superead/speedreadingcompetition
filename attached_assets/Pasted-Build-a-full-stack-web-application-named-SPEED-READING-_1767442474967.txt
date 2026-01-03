@@ -1,0 +1,279 @@
+Build a full-stack web application named:
+
+"SPEED READING COMPETITION"
+
+Tech Stack:
+- Node.js + Express backend
+- PostgreSQL + Prisma ORM
+- React (Vite) frontend
+- Tailwind CSS UI
+- JWT Authentication
+- bcrypt password hashing
+- All times handled on server in UTC
+- Project structure:
+   /server
+   /client
+- Must run in Replit
+
+USER ROLES:
+- STUDENT
+- ADMIN
+
+CATEGORIES:
+- kid
+- teen
+- adult
+
+======================
+STUDENT FEATURES
+======================
+
+REGISTRATION PAGE
+
+Fields:
+name
+surname
+gender
+birthdate
+phone
+city
+country
+email
+password
+category
+
+On registration:
+- Validate registration window from admin settings
+- Hash password
+- Save user
+- Auto-generate unique affiliateCode (8 chars)
+- referralCode input is OPTIONAL (not required)
+- If referralCode exists and matches an affiliateCode:
+     set referrerId
+     referrer.referralPoints += 1
+- Auto login and redirect to Student Dashboard
+
+LOGIN PAGE
+email + password
+
+STUDENT DASHBOARD
+
+Show:
+- Full Name
+- Category
+- Affiliate Code (copy button)
+- Referral Points
+- Referral List (users who joined with my code)
+- Competition info for their category:
+   registrationStartTime
+   registrationEndTime
+   competitionStartTime
+   readingDurationMinutes
+   answeringDurationMinutes
+   Live countdown timer
+- Assigned Book
+- Prizes section
+- Superead login button (external placeholder)
+
+COMPETITION FLOW
+
+Server is source of truth.
+
+Before competitionStartTime:
+- show countdown
+- hide actions
+
+When competition starts:
+- show "Start Reading"
+
+Start Reading:
+- save readingStartAt (server time)
+- unlock book
+- start reading timer
+
+Finish Reading:
+- save readingEndAt
+- calculate readingSeconds
+- unlock questions
+- start answering timer
+
+Answering:
+- Show MCQ and Text questions
+- Save answers continuously
+
+Finish Competition:
+- save answerEndAt
+- calculate auto score
+- display final results
+
+Auto-submit on timeout.
+
+======================
+ADMIN FEATURES
+======================
+
+ADMIN LOGIN
+Seed default admin:
+email: admin@demo.com
+password: Admin123!
+
+ADMIN DASHBOARD
+
+1) COMPETITION SETTINGS (per category)
+Fields:
+registrationStartTime
+registrationEndTime
+competitionStartTime
+readingDurationMinutes
+answeringDurationMinutes
+
+2) BOOK MANAGER (per category)
+Upload PDF
+Replace PDF
+Delete PDF
+Only 1 active book per category
+
+3) QUESTION MANAGER (per category)
+Display questions as table list:
+ID | Type | Prompt | Edit | Delete
+
+Add question:
+Type: MCQ or TEXT
+MCQ fields: options A/B/C/D + correctAnswer
+TEXT fields: prompt only
+
+4) PRIZE MANAGER (per category)
+Admin writes prize text
+
+5) USER MANAGEMENT
+List users
+Filter by category
+Show affiliate codes
+Show referral relationships
+Export CSV
+
+6) SUBMISSIONS & SCORING
+View:
+Student
+Reading time
+Answer time
+Auto score
+Manual score (for text answers)
+Final score
+Admin can edit manual score
+
+======================
+DATABASE MODELS
+
+User
+- id
+- name
+- surname
+- gender
+- birthdate
+- phone
+- city
+- country
+- email
+- passwordHash
+- category
+- role
+- affiliateCode
+- referrerId
+- referralPoints
+- createdAt
+
+CompetitionSettings
+- id
+- category
+- registrationStartTime
+- registrationEndTime
+- competitionStartTime
+- readingDurationMinutes
+- answeringDurationMinutes
+
+Book
+- id
+- category
+- title
+- fileUrl
+- createdAt
+
+Question
+- id
+- category
+- type
+- prompt
+- optionsJson
+- correctAnswer
+- createdAt
+
+Submission
+- id
+- userId
+- category
+- readingStartAt
+- readingEndAt
+- answerStartAt
+- answerEndAt
+- readingSeconds
+- score
+- manualScore
+- createdAt
+
+Answer
+- id
+- submissionId
+- questionId
+- type
+- value
+- isCorrect
+
+======================
+API ROUTES
+
+Auth:
+POST /api/auth/register
+POST /api/auth/login
+GET /api/me
+
+Student:
+GET /api/student/dashboard
+POST /api/student/start-reading
+POST /api/student/finish-reading
+GET /api/student/questions
+POST /api/student/answers
+POST /api/student/finish-competition
+
+Admin:
+GET/PUT /api/admin/settings/:category
+POST/DELETE /api/admin/book/:category
+CRUD /api/admin/questions/:category
+GET/PUT /api/admin/prizes/:category
+GET /api/admin/users
+GET /api/admin/submissions
+PUT /api/admin/submissions/:id/manual-score
+GET /api/admin/export/users.csv
+
+SECURITY
+- bcrypt password hashing
+- JWT auth
+- Server-side time validation
+- Registration window enforcement
+- Competition time enforcement
+- Basic rate limiting on auth
+
+UI
+- React + Tailwind
+- Clean admin layout
+- Student friendly dashboard
+- Toast notifications
+- Loading states
+- Copy affiliate code button
+
+DELIVERABLE
+- Full working app
+- Prisma migrations
+- Seed admin
+- README.md with setup instructions
+- .env.example

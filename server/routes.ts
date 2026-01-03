@@ -144,9 +144,15 @@ export async function registerRoutes(
         }
       }
 
+      // Check if email is already registered
+      const existingUser = await storage.getUserByEmail(data.email);
+      if (existingUser) {
+        return res.status(400).json({ error: "Email is already registered" });
+      }
+
       let referrerId: string | undefined;
-      if (data.referenceCode) {
-        const referrer = await storage.getUserByAffiliateCode(data.referenceCode);
+      if (data.referralCode) {
+        const referrer = await storage.getUserByAffiliateCode(data.referralCode);
         if (referrer) {
           referrerId = referrer.id;
           await storage.updateUser(referrer.id, {
@@ -160,11 +166,12 @@ export async function registerRoutes(
         affiliateCode = generateAffiliateCode();
       }
 
-      const passwordHash = await bcrypt.hash(affiliateCode, 10);
+      const passwordHash = await bcrypt.hash(data.password, 10);
 
       const user = await storage.createUser({
         name: data.name,
         surname: data.surname,
+        email: data.email,
         gender: data.gender,
         birthdate: data.birthdate,
         phone: data.phone,
@@ -193,9 +200,14 @@ export async function registerRoutes(
     try {
       const data = loginSchema.parse(req.body);
       
-      const user = await storage.getUserByAffiliateCode(data.affiliateCode);
-      if (!user) {
-        return res.status(401).json({ error: "Invalid affiliate code" });
+      const user = await storage.getUserByEmail(data.email);
+      if (!user || user.role !== "STUDENT") {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      const valid = await bcrypt.compare(data.password, user.passwordHash);
+      if (!valid) {
+        return res.status(401).json({ error: "Invalid email or password" });
       }
 
       const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "7d" });

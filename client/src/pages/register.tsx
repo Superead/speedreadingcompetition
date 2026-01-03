@@ -19,12 +19,14 @@ import type { Category, CompetitionSettings } from "@shared/schema";
 const registerFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   surname: z.string().min(1, "Surname is required"),
+  email: z.string().email("Valid email is required"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
   gender: z.enum(["male", "female", "other"]).optional(),
   birthdate: z.string().optional(),
   phone: z.string().optional(),
   city: z.string().optional(),
   country: z.string().optional(),
-  referenceCode: z.string().optional(),
+  referralCode: z.string().optional(),
 });
 
 type RegisterFormData = z.infer<typeof registerFormSchema>;
@@ -85,12 +87,14 @@ export default function RegisterPage() {
     defaultValues: {
       name: "",
       surname: "",
+      email: "",
+      password: "",
       gender: undefined,
       birthdate: "",
       phone: "",
       city: "",
       country: "",
-      referenceCode: "",
+      referralCode: "",
     },
   });
 
@@ -202,6 +206,34 @@ export default function RegisterPage() {
 
                   <FormField
                     control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email *</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="your@email.com" {...field} data-testid="input-email" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password *</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="Min 6 characters" {...field} data-testid="input-password" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name="gender"
                     render={({ field }) => (
                       <FormItem>
@@ -282,7 +314,7 @@ export default function RegisterPage() {
 
                   <FormField
                     control={form.control}
-                    name="referenceCode"
+                    name="referralCode"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Referral Code (optional)</FormLabel>
