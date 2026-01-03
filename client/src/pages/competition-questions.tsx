@@ -39,6 +39,7 @@ export default function CompetitionQuestionsPage() {
   const { toast } = useToast();
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [showFinishDialog, setShowFinishDialog] = useState(false);
+  const [autoSubmitting, setAutoSubmitting] = useState(false);
 
   const { data, isLoading, refetch } = useQuery<QuestionsData>({
     queryKey: ["/api/student/questions"],
@@ -127,35 +128,33 @@ export default function CompetitionQuestionsPage() {
   }, [hasCompletedCompetition, navigate]);
 
   useEffect(() => {
-    if (!data?.settings?.competitionEndTime) return;
+    if (!data?.settings?.competitionEndTime || autoSubmitting || hasCompletedCompetition) return;
     
     const competitionEnd = new Date(data.settings.competitionEndTime);
     const now = new Date();
     
-    if (now > competitionEnd) {
+    const triggerAutoSubmit = () => {
+      if (autoSubmitting) return;
+      setAutoSubmitting(true);
       toast({
         title: "Competition has ended",
         description: "Your submission has been saved.",
         variant: "destructive",
       });
       finishCompetitionMutation.mutate();
+    };
+    
+    if (now > competitionEnd) {
+      triggerAutoSubmit();
       return;
     }
     
     const timeUntilEnd = competitionEnd.getTime() - now.getTime();
     if (timeUntilEnd > 0) {
-      const timeout = setTimeout(() => {
-        toast({
-          title: "Competition has ended",
-          description: "Your submission has been saved.",
-          variant: "destructive",
-        });
-        finishCompetitionMutation.mutate();
-      }, timeUntilEnd);
-      
+      const timeout = setTimeout(triggerAutoSubmit, timeUntilEnd);
       return () => clearTimeout(timeout);
     }
-  }, [data?.settings?.competitionEndTime]);
+  }, [data?.settings?.competitionEndTime, autoSubmitting, hasCompletedCompetition]);
 
   if (isLoading) {
     return (

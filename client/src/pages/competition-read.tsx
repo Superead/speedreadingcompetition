@@ -35,6 +35,7 @@ export default function CompetitionReadPage() {
   const { toast } = useToast();
   const [showFinishDialog, setShowFinishDialog] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
+  const [autoFinishing, setAutoFinishing] = useState(false);
 
   const { data, isLoading, refetch } = useQuery<ReadingData>({
     queryKey: ["/api/student/reading"],
@@ -95,35 +96,33 @@ export default function CompetitionReadPage() {
   }, [hasFinishedReading, navigate]);
 
   useEffect(() => {
-    if (!isReadingActive || !data?.settings?.competitionEndTime) return;
+    if (!isReadingActive || !data?.settings?.competitionEndTime || autoFinishing || hasFinishedReading) return;
     
     const competitionEnd = new Date(data.settings.competitionEndTime);
     const now = new Date();
     
-    if (now > competitionEnd) {
+    const triggerAutoFinish = () => {
+      if (autoFinishing) return;
+      setAutoFinishing(true);
       toast({
         title: "Competition has ended",
         description: "Finishing reading and submitting your attempt.",
         variant: "destructive",
       });
       finishReadingMutation.mutate();
+    };
+    
+    if (now > competitionEnd) {
+      triggerAutoFinish();
       return;
     }
     
     const timeUntilEnd = competitionEnd.getTime() - now.getTime();
     if (timeUntilEnd > 0) {
-      const timeout = setTimeout(() => {
-        toast({
-          title: "Competition has ended",
-          description: "Finishing reading and submitting your attempt.",
-          variant: "destructive",
-        });
-        finishReadingMutation.mutate();
-      }, timeUntilEnd);
-      
+      const timeout = setTimeout(triggerAutoFinish, timeUntilEnd);
       return () => clearTimeout(timeout);
     }
-  }, [isReadingActive, data?.settings?.competitionEndTime]);
+  }, [isReadingActive, data?.settings?.competitionEndTime, autoFinishing, hasFinishedReading]);
 
   const handleTimeUp = () => {
     if (isReadingActive) {

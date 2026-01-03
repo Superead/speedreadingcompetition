@@ -411,6 +411,15 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Question ID is required" });
       }
 
+      const settings = await storage.getCompetitionSettings(category);
+      if (settings?.competitionEndTime) {
+        const now = new Date();
+        const end = new Date(settings.competitionEndTime);
+        if (now > end) {
+          return res.status(400).json({ error: "Competition has ended. Cannot submit new answers." });
+        }
+      }
+
       const answerValue = value !== undefined ? String(value) : "";
 
       const submission = await storage.getSubmission(user.id, category);
