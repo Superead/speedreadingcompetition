@@ -1009,13 +1009,25 @@ function SubmissionDetailDialog({ submissionId, onClose }: { submissionId: strin
   const mcqAnswers = details.answers.filter((a) => a.type === "MCQ");
   const textAnswers = details.answers.filter((a) => a.type === "TEXT");
 
-  const parseOptions = (optionsJson: string | null): string[] => {
-    if (!optionsJson) return [];
-    try {
-      return JSON.parse(optionsJson);
-    } catch {
-      return [];
+  const normalizeOptions = (options: any): string[] => {
+    if (Array.isArray(options)) return options.filter((x) => typeof x === "string");
+
+    if (typeof options === "string") {
+      try {
+        const parsed = JSON.parse(options);
+        if (Array.isArray(parsed)) return parsed.filter((x) => typeof x === "string");
+        if (parsed && typeof parsed === "object") return Object.values(parsed).filter((x) => typeof x === "string");
+      } catch {
+        return [];
+      }
     }
+
+    if (options && typeof options === "object") {
+      if (Array.isArray((options as any).options)) return (options as any).options.filter((x: any) => typeof x === "string");
+      return Object.values(options).filter((x) => typeof x === "string");
+    }
+
+    return [];
   };
 
   return (
@@ -1134,7 +1146,7 @@ function SubmissionDetailDialog({ submissionId, onClose }: { submissionId: strin
             </CardHeader>
             <CardContent className="space-y-4">
               {mcqAnswers.map((answer, index) => {
-                const options = parseOptions(answer.question.optionsJson);
+                const optionsArr = normalizeOptions(answer.question.optionsJson);
                 const isCorrect = answer.isCorrect === true;
                 const studentAnswer = answer.value;
                 const correctAnswer = answer.question.correctAnswer;
@@ -1155,30 +1167,36 @@ function SubmissionDetailDialog({ submissionId, onClose }: { submissionId: strin
                         <Badge variant="destructive">Wrong</Badge>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      {options.map((opt, optIndex) => {
-                        const optionLetter = String.fromCharCode(65 + optIndex);
-                        const isStudentChoice = studentAnswer === optionLetter;
-                        const isCorrectChoice = correctAnswer === optionLetter;
+                    {optionsArr.length === 0 ? (
+                      <div className="text-sm text-muted-foreground">
+                        No options found for this MCQ (data format mismatch).
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        {optionsArr.map((opt, optIndex) => {
+                          const optionLetter = String.fromCharCode(65 + optIndex);
+                          const isStudentChoice = studentAnswer === optionLetter;
+                          const isCorrectChoice = correctAnswer === optionLetter;
 
-                        return (
-                          <div
-                            key={optIndex}
-                            className={`p-2 rounded border ${
-                              isCorrectChoice
-                                ? "bg-green-100 dark:bg-green-900/30 border-green-500"
-                                : isStudentChoice
-                                ? "bg-red-100 dark:bg-red-900/30 border-red-500"
-                                : "bg-muted"
-                            }`}
-                          >
-                            <span className="font-medium">{optionLetter}.</span> {opt}
-                            {isCorrectChoice && <span className="ml-2 text-green-600">(Correct)</span>}
-                            {isStudentChoice && !isCorrectChoice && <span className="ml-2 text-red-600">(Student)</span>}
-                          </div>
-                        );
-                      })}
-                    </div>
+                          return (
+                            <div
+                              key={optIndex}
+                              className={`p-2 rounded border ${
+                                isCorrectChoice
+                                  ? "bg-green-100 dark:bg-green-900/30 border-green-500"
+                                  : isStudentChoice
+                                  ? "bg-red-100 dark:bg-red-900/30 border-red-500"
+                                  : "bg-muted"
+                              }`}
+                            >
+                              <span className="font-medium">{optionLetter}.</span> {opt}
+                              {isCorrectChoice && <span className="ml-2 text-green-600">(Correct)</span>}
+                              {isStudentChoice && !isCorrectChoice && <span className="ml-2 text-red-600">(Student)</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })}
