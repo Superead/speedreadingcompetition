@@ -7,6 +7,7 @@ export const roleEnum = pgEnum("role", ["STUDENT", "ADMIN"]);
 export const categoryEnum = pgEnum("category", ["kid", "teen", "adult"]);
 export const genderEnum = pgEnum("gender", ["male", "female", "other"]);
 export const questionTypeEnum = pgEnum("question_type", ["MCQ", "TEXT"]);
+export const submissionStatusEnum = pgEnum("submission_status", ["SUBMITTED", "REVIEWED", "FINALIZED"]);
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -45,6 +46,7 @@ export const competitionSettings = pgTable("competition_settings", {
   competitionStartTime: timestamp("competition_start_time"),
   readingDurationMinutes: integer("reading_duration_minutes").default(30),
   answeringDurationMinutes: integer("answering_duration_minutes").default(15),
+  resultsPublishedAt: timestamp("results_published_at"),
 });
 
 export const books = pgTable("books", {
@@ -63,6 +65,7 @@ export const questions = pgTable("questions", {
   prompt: text("prompt").notNull(),
   optionsJson: text("options_json"),
   correctAnswer: text("correct_answer"),
+  maxPoints: integer("max_points").default(1),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -75,9 +78,15 @@ export const submissions = pgTable("submissions", {
   answerStartAt: timestamp("answer_start_at"),
   answerEndAt: timestamp("answer_end_at"),
   readingSeconds: integer("reading_seconds"),
-  score: integer("score").default(0),
-  manualScore: integer("manual_score"),
+  answerSeconds: integer("answer_seconds"),
+  mcqCorrectCount: integer("mcq_correct_count").default(0),
+  mcqTotalCount: integer("mcq_total_count").default(0),
+  autoScore: integer("auto_score").default(0),
+  manualScore: integer("manual_score").default(0),
+  finalScore: integer("final_score").default(0),
+  status: submissionStatusEnum("status").default("SUBMITTED"),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const submissionsRelations = relations(submissions, ({ one, many }) => ({
@@ -116,7 +125,6 @@ export const prizes = pgTable("prizes", {
 
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
-  affiliateCode: true,
   referralPoints: true,
   createdAt: true,
 });
@@ -162,6 +170,7 @@ export const insertQuestionSchema = createInsertSchema(questions).omit({
 export const insertSubmissionSchema = createInsertSchema(submissions).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
 export const insertAnswerSchema = createInsertSchema(answers).omit({
@@ -200,3 +209,4 @@ export type Category = "kid" | "teen" | "adult";
 export type Role = "STUDENT" | "ADMIN";
 export type Gender = "male" | "female" | "other";
 export type QuestionType = "MCQ" | "TEXT";
+export type SubmissionStatus = "SUBMITTED" | "REVIEWED" | "FINALIZED";

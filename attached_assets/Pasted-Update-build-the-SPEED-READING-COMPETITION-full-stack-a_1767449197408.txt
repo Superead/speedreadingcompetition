@@ -1,0 +1,242 @@
+Update / build the “SPEED READING COMPETITION” full-stack app with the following enhancements:
+
+STACK
+- Node.js + Express
+- PostgreSQL + Prisma
+- React (Vite) + Tailwind
+- JWT auth + bcrypt
+- Server time in UTC is the source of truth
+- Monorepo: /server and /client
+
+ROLES
+- STUDENT
+- ADMIN
+
+CATEGORIES
+- kid | teen | adult
+
+================================================
+STUDENT SIDE UPDATES
+================================================
+
+1) Finish Exam Screen
+After student clicks “Finish Competition”:
+- DO NOT show score or ranking immediately.
+- Show a confirmation page:
+
+Title: “Submission received ✅”
+Body: “Results will be released soon. We will notify you.”
+Secondary text: show what was recorded:
+  - reading duration (mm:ss)
+  - answering duration (mm:ss)
+Button: “Back to Dashboard”
+
+Dashboard should show a status badge:
+- “Submitted” if submission exists and is finished
+
+2) Student Leaderboard Access Rules
+Students can see leaderboard ONLY when admin publishes results:
+- If results are NOT published: show message “Leaderboard is not available yet.”
+- If results ARE published: show leaderboard for their category + overall optional.
+
+================================================
+ADMIN SIDE UPDATES (SUBMISSIONS + ANALYSIS)
+================================================
+
+Admin Submissions List (per category filters + search):
+Table columns:
+- Student Name
+- Email
+- Category
+- Reading Time (seconds and mm:ss)
+- Answer Time (seconds and mm:ss)
+- MCQ Correct / Total MCQ (e.g., 18/25)
+- Auto Score (MCQ only)
+- Manual Score (text questions)
+- Final Score
+- Status: Submitted / Reviewed / Published
+- View Details button
+
+Admin Submission Detail Page (analysis view):
+Must show:
+A) Summary
+- Student profile info
+- Referral info (who referred them)
+- Reading start/end + duration
+- Answer start/end + duration
+- MCQ correct count
+- Final score formula breakdown
+
+B) Answers Review
+For each question show:
+- Question #, Type (MCQ/TEXT), Prompt
+- If MCQ:
+   - Options A/B/C/D
+   - Student selected option
+   - Correct option
+   - Mark as ✅ correct or ❌ wrong
+- If TEXT:
+   - Student’s text answer (full)
+   - Admin manual points input (0..max)
+   - Save button
+
+C) Correctness Computation Requirement
+System must compute on server:
+- totalMcqQuestions
+- mcqCorrectCount
+- mcqWrongCount
+- unanswered count (optional)
+and store in Submission for fast filtering.
+
+Admin can mark submission as:
+- Reviewed (after checking text answers)
+- Finalized (locks manual score)
+- Publish toggle is global (see below)
+
+================================================
+RANKING + LEADERBOARD SYSTEM
+================================================
+
+Goal:
+- Create category-based leaderboard (kid/teen/adult).
+- Ranking based on Final Score (desc).
+- Tie-breakers:
+  1) Higher Final Score wins
+  2) If tie: shorter readingSeconds wins
+  3) If tie: shorter answeringSeconds wins
+  4) If still tie: earlier submission time wins
+
+Scoring Rules:
+- MCQ: +1 per correct, 0 for wrong
+- TEXT: manualScore added by admin
+FinalScore = mcqCorrectCount + manualScore
+
+Publishing:
+Add Admin control “Publish Results” per category:
+- publishedAt per category in DB
+- If not published, students cannot see leaderboard or exact results.
+
+Leaderboard UI:
+1) Public Leaderboard Page (optional) /leaderboard/:category
+- shows Top 100
+Columns:
+Rank | Name (mask surname like “Mehmet A.” or “Mehmet Asl…”) | Country | City | Score | Reading Time | Answer Time
+- Only visible when published
+
+2) Student Dashboard Leaderboard Widget
+- Show student’s rank position if published
+- Show top 10 preview
+
+Admin Leaderboard Panel
+- View full leaderboard per category
+- Export CSV
+- “Publish / Unpublish” toggle
+- “Recalculate leaderboard” button
+
+Recalculate must:
+- recompute mcqCorrectCount for all submissions
+- ensure finalScore correct
+- then order by ranking rules
+
+================================================
+DATABASE UPDATES (Prisma)
+================================================
+
+Add / update models:
+
+CompetitionSettings
+- id
+- category
+- registrationStartTime
+- registrationEndTime
+- competitionStartTime
+- readingDurationMinutes
+- answeringDurationMinutes
+- resultsPublishedAt (nullable datetime)   // publish control per category
+
+Submission
+- id
+- userId
+- category
+- readingStartAt
+- readingEndAt
+- answerStartAt
+- answerEndAt
+- readingSeconds
+- answerSeconds
+- mcqCorrectCount (default 0)
+- mcqTotalCount (default 0)
+- autoScore (default 0)          // mcqCorrectCount
+- manualScore (default 0)
+- finalScore (default 0)
+- status (SUBMITTED | REVIEWED | FINALIZED)
+- createdAt
+- updatedAt
+
+Answer
+- id
+- submissionId
+- questionId
+- type
+- value
+- isCorrect (nullable for TEXT, boolean for MCQ once computed)
+
+Question
+- add maxPoints for TEXT questions (default 0 or 1)
+- For MCQ maxPoints = 1
+
+================================================
+API ROUTES UPDATES
+================================================
+
+Student:
+- GET /api/student/leaderboard/:category
+  - if resultsPublishedAt is null => return 403 with message
+  - else return ordered leaderboard rows
+- GET /api/student/my-rank
+  - returns user’s rank in their category (only if published)
+
+Admin:
+- GET /api/admin/submissions?category=&status=&q=
+- GET /api/admin/submissions/:id  // includes answers + question data
+- PUT /api/admin/submissions/:id/manual-score
+  - update manualScore, finalScore
+- PUT /api/admin/submissions/:id/status
+- POST /api/admin/leaderboard/recalculate?category=
+- PUT /api/admin/results/publish/:category
+  - set resultsPublishedAt = now
+- PUT /api/admin/results/unpublish/:category
+  - set resultsPublishedAt = null
+- GET /api/admin/leaderboard/:category
+- GET /api/admin/export/leaderboard.csv?category=
+
+Computation Requirements (server-side):
+- On finish-competition:
+   - compute mcqTotalCount
+   - compute mcqCorrectCount by comparing answers to correctAnswer
+   - set autoScore = mcqCorrectCount
+   - set finalScore = autoScore + manualScore (manualScore default 0)
+   - set status SUBMITTED
+- On manual scoring update:
+   - recompute finalScore
+
+================================================
+UI REQUIREMENTS
+================================================
+
+Student:
+- Finish screen shows “Results will be released soon…”
+- Dashboard shows submission status
+- Leaderboard accessible only if published
+
+Admin:
+- Submissions list shows MCQ correct/total
+- Submission details shows per-question analysis
+- Publish results per category + leaderboard view
+
+DELIVERABLES
+- Fully working updated app
+- Migrations + seed admin
+- README setup
+- .env.example
+- Ensure everything runs on Replit

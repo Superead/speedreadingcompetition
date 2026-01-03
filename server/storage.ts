@@ -3,10 +3,34 @@ import {
   type User, type InsertUser, type CompetitionSettings, type InsertCompetitionSettings,
   type Book, type InsertBook, type Question, type InsertQuestion,
   type Submission, type InsertSubmission, type Answer, type InsertAnswer,
-  type Prize, type InsertPrize, type Category
+  type Prize, type InsertPrize, type Category, type SubmissionStatus
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc, asc, sql } from "drizzle-orm";
+
+export interface SubmissionWithUser extends Submission {
+  userName: string;
+  userEmail: string | null;
+  userCity: string | null;
+  userCountry: string | null;
+}
+
+export interface SubmissionWithDetails extends Submission {
+  user: User;
+  referrer?: User;
+  answers: (Answer & { question: Question })[];
+}
+
+export interface LeaderboardEntry {
+  rank: number;
+  name: string;
+  city: string | null;
+  country: string | null;
+  finalScore: number;
+  readingSeconds: number | null;
+  answerSeconds: number | null;
+  userId: string;
+}
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -40,12 +64,20 @@ export interface IStorage {
 
   getSubmission(userId: string, category: Category): Promise<Submission | undefined>;
   getSubmissionById(id: string): Promise<Submission | undefined>;
+  getSubmissionWithDetails(id: string): Promise<SubmissionWithDetails | undefined>;
   createSubmission(data: InsertSubmission): Promise<Submission>;
   updateSubmission(id: string, data: Partial<Submission>): Promise<Submission | undefined>;
-  getAllSubmissions(): Promise<(Submission & { userName: string })[]>;
+  getAllSubmissions(): Promise<SubmissionWithUser[]>;
+  getSubmissionsByCategory(category: Category, status?: SubmissionStatus): Promise<SubmissionWithUser[]>;
+  getLeaderboard(category: Category): Promise<LeaderboardEntry[]>;
+  recalculateSubmissionScores(submissionId: string): Promise<Submission | undefined>;
 
   getAnswers(submissionId: string): Promise<Answer[]>;
   upsertAnswer(submissionId: string, questionId: string, type: "MCQ" | "TEXT", value: string): Promise<Answer>;
+  updateAnswerCorrectness(answerId: string, isCorrect: boolean): Promise<Answer | undefined>;
+
+  publishResults(category: Category): Promise<CompetitionSettings>;
+  unpublishResults(category: Category): Promise<CompetitionSettings>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -213,19 +245,141 @@ export class DatabaseStorage implements IStorage {
     return submission || undefined;
   }
 
-  async getAllSubmissions(): Promise<(Submission & { userName: string })[]> {
+  async getAllSubmissions(): Promise<SubmissionWithUser[]> {
     const allSubmissions = await db.select().from(submissions);
-    const result: (Submission & { userName: string })[] = [];
+    const result: SubmissionWithUser[] = [];
     
     for (const sub of allSubmissions) {
       const user = await this.getUser(sub.userId);
       result.push({
         ...sub,
         userName: user ? `${user.name} ${user.surname}` : "Unknown",
+        userEmail: user?.email || null,
+        userCity: user?.city || null,
+        userCountry: user?.country || null,
       });
     }
     
     return result;
+  }
+
+  async getSubmissionsByCategory(category: Category, status?: SubmissionStatus): Promise<SubmissionWithUser[]> {
+    let query = db.select().from(submissions).where(eq(submissions.category, category));
+    const allSubmissions = status 
+      ? await db.select().from(submissions).where(and(eq(submissions.category, category), eq(submissions.status, status)))
+      : await db.select().from(submissions).where(eq(submissions.category, category));
+    
+    const result: SubmissionWithUser[] = [];
+    for (const sub of allSubmissions) {
+      const user = await this.getUser(sub.userId);
+      result.push({
+        ...sub,
+        userName: user ? `${user.name} ${user.surname}` : "Unknown",
+        userEmail: user?.email || null,
+        userCity: user?.city || null,
+        userCountry: user?.country || null,
+      });
+    }
+    return result;
+  }
+
+  async getSubmissionWithDetails(id: string): Promise<SubmissionWithDetails | undefined> {
+    const submission = await this.getSubmissionById(id);
+    if (!submission) return undefined;
+
+    const user = await this.getUser(submission.userId);
+    if (!user) return undefined;
+
+    let referrer: User | undefined;
+    if (user.referrerId) {
+      referrer = await this.getUser(user.referrerId);
+    }
+
+    const submissionAnswers = await this.getAnswers(id);
+    const answersWithQuestions: (Answer & { question: Question })[] = [];
+    
+    for (const ans of submissionAnswers) {
+      const question = await this.getQuestion(ans.questionId);
+      if (question) {
+        answersWithQuestions.push({ ...ans, question });
+      }
+    }
+
+    return {
+      ...submission,
+      user,
+      referrer,
+      answers: answersWithQuestions,
+    };
+  }
+
+  async getLeaderboard(category: Category): Promise<LeaderboardEntry[]> {
+    const allSubmissions = await db.select().from(submissions)
+      .where(eq(submissions.category, category))
+      .orderBy(
+        desc(submissions.finalScore),
+        asc(submissions.readingSeconds),
+        asc(submissions.answerSeconds),
+        asc(submissions.createdAt)
+      );
+    
+    const entries: LeaderboardEntry[] = [];
+    let rank = 1;
+    
+    for (const sub of allSubmissions) {
+      const user = await this.getUser(sub.userId);
+      if (user) {
+        const maskedName = `${user.name} ${user.surname.charAt(0)}.`;
+        entries.push({
+          rank,
+          name: maskedName,
+          city: user.city,
+          country: user.country,
+          finalScore: sub.finalScore || 0,
+          readingSeconds: sub.readingSeconds,
+          answerSeconds: sub.answerSeconds,
+          userId: user.id,
+        });
+        rank++;
+      }
+    }
+    
+    return entries;
+  }
+
+  async recalculateSubmissionScores(submissionId: string): Promise<Submission | undefined> {
+    const submission = await this.getSubmissionById(submissionId);
+    if (!submission) return undefined;
+
+    const submissionAnswers = await this.getAnswers(submissionId);
+    const categoryQuestions = await this.getQuestions(submission.category);
+    
+    const mcqQuestions = categoryQuestions.filter(q => q.type === "MCQ");
+    const mcqTotalCount = mcqQuestions.length;
+    let mcqCorrectCount = 0;
+
+    for (const ans of submissionAnswers) {
+      if (ans.type === "MCQ") {
+        const question = mcqQuestions.find(q => q.id === ans.questionId);
+        if (question && ans.value === question.correctAnswer) {
+          mcqCorrectCount++;
+          await db.update(answers).set({ isCorrect: true }).where(eq(answers.id, ans.id));
+        } else if (question) {
+          await db.update(answers).set({ isCorrect: false }).where(eq(answers.id, ans.id));
+        }
+      }
+    }
+
+    const autoScore = mcqCorrectCount;
+    const finalScore = autoScore + (submission.manualScore || 0);
+
+    return this.updateSubmission(submissionId, {
+      mcqTotalCount,
+      mcqCorrectCount,
+      autoScore,
+      finalScore,
+      updatedAt: new Date(),
+    });
   }
 
   async getAnswers(submissionId: string): Promise<Answer[]> {
@@ -248,6 +402,26 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return created;
     }
+  }
+
+  async updateAnswerCorrectness(answerId: string, isCorrect: boolean): Promise<Answer | undefined> {
+    const [updated] = await db.update(answers)
+      .set({ isCorrect })
+      .where(eq(answers.id, answerId))
+      .returning();
+    return updated || undefined;
+  }
+
+  async publishResults(category: Category): Promise<CompetitionSettings> {
+    return this.upsertCompetitionSettings(category, { resultsPublishedAt: new Date() });
+  }
+
+  async unpublishResults(category: Category): Promise<CompetitionSettings> {
+    const [updated] = await db.update(competitionSettings)
+      .set({ resultsPublishedAt: null })
+      .where(eq(competitionSettings.category, category))
+      .returning();
+    return updated;
   }
 }
 

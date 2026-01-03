@@ -421,28 +421,26 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Competition already finished" });
       }
 
-      const [questions, userAnswers] = await Promise.all([
-        storage.getQuestions(category),
-        storage.getAnswers(submission.id),
-      ]);
-
-      let score = 0;
-      for (const question of questions) {
-        if (question.type === "MCQ") {
-          const answer = userAnswers.find((a) => a.questionId === question.id);
-          if (answer && answer.value === question.correctAnswer) {
-            score += 1;
-          }
-        }
-      }
-
       const answerEndAt = new Date();
-      const updated = await storage.updateSubmission(submission.id, {
+      const answerStartAt = submission.answerStartAt || submission.readingEndAt;
+      const answerSeconds = answerStartAt 
+        ? Math.floor((answerEndAt.getTime() - new Date(answerStartAt).getTime()) / 1000)
+        : 0;
+
+      await storage.updateSubmission(submission.id, {
         answerEndAt,
-        score,
+        answerSeconds,
+        status: "SUBMITTED",
       });
 
-      res.json({ submission: updated, score });
+      const updated = await storage.recalculateSubmissionScores(submission.id);
+
+      res.json({ 
+        success: true,
+        submission: updated,
+        readingSeconds: updated?.readingSeconds || 0,
+        answerSeconds: updated?.answerSeconds || 0,
+      });
     } catch (error) {
       console.error("Finish competition error:", error);
       res.status(500).json({ error: "Failed to finish competition" });
@@ -692,6 +690,206 @@ export async function registerRoutes(
       res.send(csv);
     } catch (error) {
       res.status(500).json({ error: "Failed to export users" });
+    }
+  });
+
+  app.get("/api/student/leaderboard/:category", authMiddleware, studentMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const categoryResult = categorySchema.safeParse(req.params.category);
+      if (!categoryResult.success) {
+        return res.status(400).json({ error: "Invalid category" });
+      }
+      const category = categoryResult.data;
+
+      const settings = await storage.getCompetitionSettings(category);
+      if (!settings?.resultsPublishedAt) {
+        return res.status(403).json({ error: "Leaderboard is not available yet." });
+      }
+
+      const leaderboard = await storage.getLeaderboard(category);
+      res.json(leaderboard.slice(0, 100));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch leaderboard" });
+    }
+  });
+
+  app.get("/api/student/my-rank", authMiddleware, studentMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const user = req.user!;
+      const category = user.category as Category;
+
+      const settings = await storage.getCompetitionSettings(category);
+      if (!settings?.resultsPublishedAt) {
+        return res.status(403).json({ error: "Results not published yet" });
+      }
+
+      const leaderboard = await storage.getLeaderboard(category);
+      const myEntry = leaderboard.find(e => e.userId === user.id);
+
+      res.json({ 
+        rank: myEntry?.rank || null,
+        totalParticipants: leaderboard.length,
+        topTen: leaderboard.slice(0, 10),
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch rank" });
+    }
+  });
+
+  app.get("/api/admin/submissions/:id", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const submission = await storage.getSubmissionWithDetails(id);
+      
+      if (!submission) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
+
+      res.json(submission);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch submission details" });
+    }
+  });
+
+  app.put("/api/admin/submissions/:id/status", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      if (!["SUBMITTED", "REVIEWED", "FINALIZED"].includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+
+      const submission = await storage.updateSubmission(id, { status, updatedAt: new Date() });
+      if (!submission) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
+
+      res.json(submission);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update status" });
+    }
+  });
+
+  app.put("/api/admin/answers/:answerId/manual-score", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const { answerId } = req.params;
+      const { points, submissionId } = req.body;
+
+      if (typeof points !== "number" || points < 0) {
+        return res.status(400).json({ error: "Invalid points value" });
+      }
+
+      const submission = await storage.getSubmissionById(submissionId);
+      if (!submission) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
+
+      const newManualScore = (submission.manualScore || 0) + points;
+      const newFinalScore = (submission.autoScore || 0) + newManualScore;
+
+      await storage.updateSubmission(submissionId, { 
+        manualScore: newManualScore, 
+        finalScore: newFinalScore,
+        updatedAt: new Date(),
+      });
+
+      res.json({ success: true, manualScore: newManualScore, finalScore: newFinalScore });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update manual score" });
+    }
+  });
+
+  app.post("/api/admin/leaderboard/recalculate", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const { category } = req.query;
+      const categoryResult = categorySchema.safeParse(category);
+      if (!categoryResult.success) {
+        return res.status(400).json({ error: "Invalid category" });
+      }
+
+      const submissions = await storage.getSubmissionsByCategory(categoryResult.data);
+      
+      for (const sub of submissions) {
+        await storage.recalculateSubmissionScores(sub.id);
+      }
+
+      const leaderboard = await storage.getLeaderboard(categoryResult.data);
+      res.json({ success: true, count: submissions.length, leaderboard });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to recalculate leaderboard" });
+    }
+  });
+
+  app.put("/api/admin/results/publish/:category", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const categoryResult = categorySchema.safeParse(req.params.category);
+      if (!categoryResult.success) {
+        return res.status(400).json({ error: "Invalid category" });
+      }
+
+      const settings = await storage.publishResults(categoryResult.data);
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to publish results" });
+    }
+  });
+
+  app.put("/api/admin/results/unpublish/:category", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const categoryResult = categorySchema.safeParse(req.params.category);
+      if (!categoryResult.success) {
+        return res.status(400).json({ error: "Invalid category" });
+      }
+
+      const settings = await storage.unpublishResults(categoryResult.data);
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to unpublish results" });
+    }
+  });
+
+  app.get("/api/admin/leaderboard/:category", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const categoryResult = categorySchema.safeParse(req.params.category);
+      if (!categoryResult.success) {
+        return res.status(400).json({ error: "Invalid category" });
+      }
+
+      const leaderboard = await storage.getLeaderboard(categoryResult.data);
+      res.json(leaderboard);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch leaderboard" });
+    }
+  });
+
+  app.get("/api/admin/export/leaderboard.csv", authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+      const categoryResult = categorySchema.safeParse(req.query.category);
+      if (!categoryResult.success) {
+        return res.status(400).json({ error: "Invalid category" });
+      }
+
+      const leaderboard = await storage.getLeaderboard(categoryResult.data);
+      
+      const headers = ["Rank", "Name", "City", "Country", "Final Score", "Reading Time (s)", "Answer Time (s)"];
+      const rows = leaderboard.map((e) => [
+        String(e.rank),
+        e.name,
+        e.city || "",
+        e.country || "",
+        String(e.finalScore),
+        String(e.readingSeconds || 0),
+        String(e.answerSeconds || 0),
+      ]);
+
+      const csv = [headers.join(","), ...rows.map((r) => r.map((c) => `"${c}"`).join(","))].join("\n");
+
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename=leaderboard-${categoryResult.data}.csv`);
+      res.send(csv);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to export leaderboard" });
     }
   });
 
