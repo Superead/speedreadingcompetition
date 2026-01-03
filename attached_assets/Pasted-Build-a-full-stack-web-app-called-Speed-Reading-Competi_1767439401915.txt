@@ -1,0 +1,190 @@
+Build a full-stack web app called “Speed Reading Competition”.
+
+Tech requirements:
+- Use Node.js + Express.js backend
+- Use PostgreSQL with Prisma ORM
+- Use React (Vite) frontend
+- Use JWT authentication
+- Use Tailwind CSS for UI
+- App must run in Replit (single repo: /server and /client)
+- Provide seed data and simple admin creation
+- Include .env example
+- Add basic validation and error handling
+- Use server-side time as source of truth (prevent client cheating)
+- All times stored in UTC, frontend shows local time based on user browser
+
+ROLES:
+1) Student (competitor)
+2) Admin
+
+CATEGORIES:
+- kid
+- teen
+- adult
+
+CORE FEATURES (STUDENT):
+
+A) Landing
+- Page shows 3 category cards (Kids / Teen / Adult)
+- Each card shows: “Registration opens”, “Competition starts”, countdown timers
+- Student chooses category and goes to Register form
+
+B) Registration Form (only allowed when admin has opened registration for that category)
+Fields:
+- name (required)
+- surname (required)
+- gender (male/female/other)
+- birthdate (date)
+- phone (string)
+- city (string)
+- country (string)
+- referenceCode (optional)  // affiliate code
+- category (kid/teen/adult)
+On submit:
+- create user
+- generate unique affiliateCode for this user (6-10 chars)
+- if referenceCode matches an existing user’s affiliateCode:
+  - store referrerId
+  - increment referrer referralPoints by 1
+- then auto-login student and redirect to Student Dashboard
+
+C) Student Dashboard
+Show:
+- Full name
+- Category
+- Affiliate code + copy button
+- Referral points
+- Referral list: users who joined via my code (name, email if collected, category, date)
+- Competition info for my category:
+  - registrationStartTime
+  - registrationEndTime
+  - competitionStartTime
+  - readingDurationMinutes
+  - answeringDurationMinutes
+  - Countdown timer until competition start
+- Book for my category (title + “Start Reading” flow)
+- Prizes section for my category (text fields stored by admin)
+- Superead login button (external link placeholder)
+
+D) Competition Flow
+Server is authority. Student cannot start early.
+States:
+1) Before competitionStartTime: show countdown, disable actions
+2) When competitionStartTime reached:
+   - show “Start Reading”
+3) When student clicks “Start Reading”:
+   - create or update Submission row
+   - set readingStartAt = server time
+   - return a signed “reading session” token
+   - show book content (simple PDF viewer or placeholder text) + timer counting down readingDurationMinutes
+4) Student clicks “Finish Reading” any time:
+   - set readingEndAt = server time
+   - calculate readingSeconds
+   - unlock questions
+5) Questions:
+   - support MCQ and text questions
+   - show answer timer (answeringDurationMinutes)
+   - allow submit per question and final submit
+6) Finish Competition:
+   - set answerEndAt = server time
+   - calculate score:
+      - for MCQ: +1 correct, 0 wrong
+      - for text: store text; admin can manually score later OR default score 0
+   - show final screen: score + reading time + answering time
+
+Auto rules:
+- If reading timer expires and student didn’t click finish, server closes reading automatically when they attempt next action (or cron-like check on submission fetch)
+- If answering timer expires, auto-submit on next request
+
+CORE FEATURES (ADMIN):
+
+A) Admin Auth
+- Hardcode seed admin creation: email admin@demo.com / password Admin123! (can change via env)
+- Admin login page
+
+B) Admin Dashboard
+Tabs:
+1) Competition Settings per category:
+   - registrationStartTime (datetime)
+   - registrationEndTime (datetime)
+   - competitionStartTime (datetime)
+   - readingDurationMinutes (number)
+   - answeringDurationMinutes (number)
+   Save per category
+2) Book Manager per category:
+   - upload a PDF (store file in server /uploads and save URL)
+   - replace/delete
+   - only 1 active book per category
+3) Questions per category:
+   - add question
+   - question type: MCQ or TEXT
+   - for MCQ: options A/B/C/D and correct option
+   - for TEXT: prompt only
+   - ability to delete/edit questions
+4) Prizes per category:
+   - rich text or markdown string
+5) Users list:
+   - total users
+   - filter by category
+   - show referral relationships (who referred whom)
+   - export CSV button
+6) Submissions list:
+   - readingStartAt, readingEndAt, readingSeconds
+   - answerEndAt
+   - score
+   - view answers
+   - for text answers: admin can assign manual points and save final score
+
+DATABASE (Prisma models):
+- User: id, email(optional), passwordHash, role (STUDENT/ADMIN), name, surname, gender, birthdate, phone, city, country, category, affiliateCode, referrerId, referralPoints, createdAt
+- CompetitionSettings: id, category, registrationStartTime, registrationEndTime, competitionStartTime, readingDurationMinutes, answeringDurationMinutes
+- Book: id, category, title, fileUrl, createdAt
+- Question: id, category, type, prompt, optionsJson, correctAnswer, createdAt
+- Submission: id, userId, category, readingStartAt, readingEndAt, answerStartAt, answerEndAt, readingSeconds, score, manualScore, createdAt
+- Answer: id, submissionId, questionId, type, value, isCorrect(optional)
+
+API ROUTES:
+- POST /api/auth/login
+- POST /api/auth/register
+- GET /api/me
+- Student:
+  - GET /api/student/dashboard
+  - POST /api/student/start-reading
+  - POST /api/student/finish-reading
+  - GET /api/student/questions
+  - POST /api/student/answers
+  - POST /api/student/finish-competition
+- Admin:
+  - GET/PUT /api/admin/settings/:category
+  - POST/DELETE /api/admin/book/:category
+  - CRUD /api/admin/questions/:category
+  - GET/PUT /api/admin/prizes/:category
+  - GET /api/admin/users
+  - GET /api/admin/submissions
+  - PUT /api/admin/submissions/:id/manual-score
+  - GET /api/admin/export/users.csv
+
+UI:
+- Clean simple UI
+- Use Tailwind
+- Add copy-to-clipboard for affiliate code
+- Use toast notifications
+- Add loading states
+
+SECURITY / VALIDATION:
+- Validate category enum
+- Validate registration window (server-side)
+- Validate competition start (server-side)
+- Use server time for all timers
+- Rate-limit auth routes (basic)
+- Hash passwords (bcrypt)
+
+DELIVERABLES:
+- Working app with instructions:
+  - how to run migrations
+  - how to seed admin
+  - how to run both client and server in Replit
+- Provide README.md
+- Provide sample seed settings/books/questions
+
+Make sure everything compiles and runs.
