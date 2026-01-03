@@ -31,6 +31,10 @@ import {
   Loader2,
   Shield,
   Edit,
+  Trophy,
+  Eye,
+  EyeOff,
+  RefreshCw,
 } from "lucide-react";
 import type { CompetitionSettings, Book, Question, Prize, User, Submission, Category } from "@shared/schema";
 import {
@@ -867,7 +871,7 @@ function SubmissionsTab() {
                     </TableCell>
                     <TableCell><Badge variant="outline">{getCategoryTitle(submission.category)}</Badge></TableCell>
                     <TableCell>{formatDuration(submission.readingSeconds)}</TableCell>
-                    <TableCell>{submission.score ?? "-"}</TableCell>
+                    <TableCell>{submission.autoScore ?? "-"}</TableCell>
                     <TableCell>
                       <Input
                         type="number"
@@ -899,6 +903,224 @@ function SubmissionsTab() {
               </TableBody>
             </Table>
           </ScrollArea>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+interface LeaderboardEntry {
+  rank: number;
+  userId: string;
+  name: string;
+  city: string | null;
+  country: string | null;
+  finalScore: number;
+  readingSeconds: number | null;
+  answerSeconds: number | null;
+}
+
+function LeaderboardTab() {
+  const { toast } = useToast();
+  const [selectedCategory, setSelectedCategory] = useState<Category>("kid");
+
+  const { data: settings } = useQuery<CompetitionSettings[]>({
+    queryKey: ["/api/admin/settings"],
+  });
+
+  const currentSettings = settings?.find((s) => s.category === selectedCategory);
+  const isPublished = currentSettings?.resultsPublishedAt != null;
+
+  const { data: leaderboard, isLoading, refetch } = useQuery<LeaderboardEntry[]>({
+    queryKey: ["/api/admin/leaderboard", selectedCategory],
+  });
+
+  const publishMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PUT", `/api/admin/results/publish/${selectedCategory}`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/leaderboard", selectedCategory] });
+      toast({ title: "Results published", description: `${getCategoryTitle(selectedCategory)} leaderboard is now visible to students.` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to publish", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const unpublishMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PUT", `/api/admin/results/unpublish/${selectedCategory}`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      toast({ title: "Results unpublished", description: `${getCategoryTitle(selectedCategory)} leaderboard is now hidden from students.` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to unpublish", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const recalculateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/admin/leaderboard/recalculate?category=${selectedCategory}`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/leaderboard", selectedCategory] });
+      toast({ title: "Leaderboard recalculated", description: "All scores have been refreshed." });
+      refetch();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to recalculate", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleExport = () => {
+    window.open(`/api/admin/export/leaderboard.csv?category=${selectedCategory}`, "_blank");
+  };
+
+  const formatDuration = (seconds: number | null) => {
+    if (!seconds) return "-";
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Label>Category</Label>
+          <Select value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as Category)}>
+            <SelectTrigger className="w-40" data-testid="select-leaderboard-category">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CATEGORIES.map((cat) => (
+                <SelectItem key={cat} value={cat}>{getCategoryTitle(cat)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {isPublished ? (
+            <Badge className="bg-green-600">Published</Badge>
+          ) : (
+            <Badge variant="outline">Not Published</Badge>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => recalculateMutation.mutate()}
+            disabled={recalculateMutation.isPending}
+            className="gap-2"
+            data-testid="button-recalculate"
+          >
+            {recalculateMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            Recalculate
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={handleExport}
+            className="gap-2"
+            data-testid="button-export-leaderboard"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+          {isPublished ? (
+            <Button 
+              variant="destructive" 
+              onClick={() => unpublishMutation.mutate()}
+              disabled={unpublishMutation.isPending}
+              className="gap-2"
+              data-testid="button-unpublish"
+            >
+              {unpublishMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <EyeOff className="h-4 w-4" />
+              )}
+              Unpublish
+            </Button>
+          ) : (
+            <Button 
+              onClick={() => publishMutation.mutate()}
+              disabled={publishMutation.isPending}
+              className="gap-2"
+              data-testid="button-publish"
+            >
+              {publishMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+              Publish Results
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Trophy className="h-5 w-5" />
+            {getCategoryTitle(selectedCategory)} Leaderboard
+          </CardTitle>
+          <CardDescription>
+            {leaderboard?.length || 0} participants ranked
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-96 w-full" />
+          ) : leaderboard && leaderboard.length > 0 ? (
+            <ScrollArea className="h-[500px]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16">Rank</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead className="text-right">Score</TableHead>
+                    <TableHead className="text-right">Reading</TableHead>
+                    <TableHead className="text-right">Answers</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {leaderboard.map((entry) => (
+                    <TableRow key={entry.userId} data-testid={`row-leaderboard-${entry.rank}`}>
+                      <TableCell className="font-bold">
+                        {entry.rank === 1 && <span className="text-yellow-500">1st</span>}
+                        {entry.rank === 2 && <span className="text-gray-400">2nd</span>}
+                        {entry.rank === 3 && <span className="text-amber-600">3rd</span>}
+                        {entry.rank > 3 && entry.rank}
+                      </TableCell>
+                      <TableCell className="font-medium">{entry.name}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {entry.city}{entry.city && entry.country ? ", " : ""}{entry.country}
+                      </TableCell>
+                      <TableCell className="text-right font-bold">{entry.finalScore}</TableCell>
+                      <TableCell className="text-right">{formatDuration(entry.readingSeconds)}</TableCell>
+                      <TableCell className="text-right">{formatDuration(entry.answerSeconds)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          ) : (
+            <p className="text-center text-muted-foreground py-8">
+              No completed submissions yet
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -951,7 +1173,7 @@ export default function AdminDashboard() {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="settings" className="space-y-6">
-          <TabsList className="grid grid-cols-3 lg:grid-cols-6 w-full max-w-3xl">
+          <TabsList className="grid grid-cols-4 lg:grid-cols-7 w-full max-w-4xl">
             <TabsTrigger value="settings" className="gap-2" data-testid="tab-settings">
               <Settings className="h-4 w-4 hidden sm:inline" />
               Settings
@@ -976,6 +1198,10 @@ export default function AdminDashboard() {
               <FileText className="h-4 w-4 hidden sm:inline" />
               Submissions
             </TabsTrigger>
+            <TabsTrigger value="leaderboard" className="gap-2" data-testid="tab-leaderboard">
+              <Trophy className="h-4 w-4 hidden sm:inline" />
+              Leaderboard
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="settings"><SettingsTab /></TabsContent>
@@ -984,6 +1210,7 @@ export default function AdminDashboard() {
           <TabsContent value="prizes"><PrizesTab /></TabsContent>
           <TabsContent value="users"><UsersTab /></TabsContent>
           <TabsContent value="submissions"><SubmissionsTab /></TabsContent>
+          <TabsContent value="leaderboard"><LeaderboardTab /></TabsContent>
         </Tabs>
       </main>
     </div>

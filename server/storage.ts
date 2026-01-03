@@ -70,6 +70,7 @@ export interface IStorage {
   getAllSubmissions(): Promise<SubmissionWithUser[]>;
   getSubmissionsByCategory(category: Category, status?: SubmissionStatus): Promise<SubmissionWithUser[]>;
   getLeaderboard(category: Category): Promise<LeaderboardEntry[]>;
+  getAdminLeaderboard(category: Category): Promise<LeaderboardEntry[]>;
   recalculateSubmissionScores(submissionId: string): Promise<Submission | undefined>;
 
   getAnswers(submissionId: string): Promise<Answer[]>;
@@ -333,6 +334,40 @@ export class DatabaseStorage implements IStorage {
         entries.push({
           rank,
           name: maskedName,
+          city: user.city,
+          country: user.country,
+          finalScore: sub.finalScore || 0,
+          readingSeconds: sub.readingSeconds,
+          answerSeconds: sub.answerSeconds,
+          userId: user.id,
+        });
+        rank++;
+      }
+    }
+    
+    return entries;
+  }
+
+  async getAdminLeaderboard(category: Category): Promise<LeaderboardEntry[]> {
+    const allSubmissions = await db.select().from(submissions)
+      .where(eq(submissions.category, category))
+      .orderBy(
+        desc(submissions.finalScore),
+        asc(submissions.readingSeconds),
+        asc(submissions.answerSeconds),
+        asc(submissions.createdAt)
+      );
+    
+    const entries: LeaderboardEntry[] = [];
+    let rank = 1;
+    
+    for (const sub of allSubmissions) {
+      const user = await this.getUser(sub.userId);
+      if (user) {
+        const fullName = `${user.name} ${user.surname}`;
+        entries.push({
+          rank,
+          name: fullName,
           city: user.city,
           country: user.country,
           finalScore: sub.finalScore || 0,

@@ -856,7 +856,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid category" });
       }
 
-      const leaderboard = await storage.getLeaderboard(categoryResult.data);
+      const leaderboard = await storage.getAdminLeaderboard(categoryResult.data);
       res.json(leaderboard);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch leaderboard" });
@@ -870,7 +870,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid category" });
       }
 
-      const leaderboard = await storage.getLeaderboard(categoryResult.data);
+      const leaderboard = await storage.getAdminLeaderboard(categoryResult.data);
       
       const headers = ["Rank", "Name", "City", "Country", "Final Score", "Reading Time (s)", "Answer Time (s)"];
       const rows = leaderboard.map((e) => [

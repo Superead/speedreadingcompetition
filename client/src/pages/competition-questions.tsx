@@ -81,11 +81,11 @@ export default function CompetitionQuestionsPage() {
       const res = await apiRequest("POST", "/api/student/finish-competition", {});
       return res.json();
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/student/dashboard"] });
       toast({
-        title: "Competition completed!",
-        description: `Your score: ${data.score} points`,
+        title: "Submission received!",
+        description: "Your answers have been submitted successfully. Results will be available once published.",
       });
       navigate("/dashboard");
     },

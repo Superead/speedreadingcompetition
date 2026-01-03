@@ -19,9 +19,21 @@ import {
   LogOut, 
   Gift,
   ExternalLink,
-  CheckCircle
+  CheckCircle,
+  Award,
+  Medal
 } from "lucide-react";
 import type { CompetitionSettings, Book, Prize, User, Submission } from "@shared/schema";
+
+interface LeaderboardEntry {
+  rank: number;
+  name: string;
+  city: string | null;
+  country: string | null;
+  finalScore: number;
+  readingSeconds: number | null;
+  answerSeconds: number | null;
+}
 
 interface DashboardData {
   settings: CompetitionSettings | null;
@@ -65,6 +77,13 @@ export default function DashboardPage() {
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/student/dashboard"],
     enabled: !!token,
+  });
+
+  const resultsPublished = data?.settings?.resultsPublishedAt != null;
+
+  const { data: leaderboardData, isLoading: leaderboardLoading } = useQuery<LeaderboardEntry[]>({
+    queryKey: ["/api/student/leaderboard", user?.category],
+    enabled: !!token && !!user?.category && resultsPublished,
   });
 
   const handleCopyCode = () => {
@@ -223,12 +242,18 @@ export default function DashboardPage() {
                       <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-semibold">Competition Completed!</h3>
-                      <p className="text-muted-foreground">
-                        Your score: <span className="font-bold text-foreground">{data?.submission?.score || 0}</span> points
-                      </p>
+                      <h3 className="text-xl font-semibold">Submission Received!</h3>
+                      {resultsPublished ? (
+                        <p className="text-muted-foreground">
+                          Results have been published. Check the leaderboard below!
+                        </p>
+                      ) : (
+                        <p className="text-muted-foreground">
+                          Your answers have been submitted. Results will be available once published by the organizers.
+                        </p>
+                      )}
                       {data?.submission?.readingSeconds && (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-muted-foreground mt-2">
                           Reading time: {Math.floor(data.submission.readingSeconds / 60)}m {data.submission.readingSeconds % 60}s
                         </p>
                       )}
@@ -342,6 +367,76 @@ export default function DashboardPage() {
                 )}
               </CardContent>
             </Card>
+
+            {resultsPublished && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Trophy className="h-5 w-5" />
+                    Leaderboard
+                  </CardTitle>
+                  <CardDescription>
+                    Top performers in {getCategoryTitle(user?.category || "")} category
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {leaderboardLoading ? (
+                    <div className="space-y-2">
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                    </div>
+                  ) : leaderboardData && leaderboardData.length > 0 ? (
+                    <ScrollArea className="h-80">
+                      <div className="space-y-2">
+                        {leaderboardData.slice(0, 20).map((entry) => (
+                          <div 
+                            key={entry.rank}
+                            className="flex items-center justify-between py-3 px-4 rounded-md bg-muted"
+                            data-testid={`leaderboard-entry-${entry.rank}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              {entry.rank === 1 && (
+                                <Trophy className="h-5 w-5 text-yellow-500" />
+                              )}
+                              {entry.rank === 2 && (
+                                <Medal className="h-5 w-5 text-gray-400" />
+                              )}
+                              {entry.rank === 3 && (
+                                <Award className="h-5 w-5 text-amber-600" />
+                              )}
+                              {entry.rank > 3 && (
+                                <span className="w-5 text-center text-sm font-medium text-muted-foreground">
+                                  {entry.rank}
+                                </span>
+                              )}
+                              <div>
+                                <p className="font-medium">{entry.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {entry.city}{entry.city && entry.country ? ", " : ""}{entry.country}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold">{entry.finalScore} pts</p>
+                              {entry.readingSeconds && (
+                                <p className="text-xs text-muted-foreground">
+                                  {Math.floor(entry.readingSeconds / 60)}m {entry.readingSeconds % 60}s
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  ) : (
+                    <p className="text-center text-muted-foreground py-4">
+                      No results yet
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>
