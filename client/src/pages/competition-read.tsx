@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,6 +36,7 @@ export default function CompetitionReadPage() {
   const [showFinishDialog, setShowFinishDialog] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [autoFinishing, setAutoFinishing] = useState(false);
+  const finishingRef = useRef(false);
 
   const { data, isLoading, refetch } = useQuery<ReadingData>({
     queryKey: ["/api/student/reading"],
@@ -83,6 +84,8 @@ export default function CompetitionReadPage() {
         description: error.message,
         variant: "destructive",
       });
+      finishingRef.current = false;
+      setAutoFinishing(false);
     },
   });
 
@@ -102,7 +105,8 @@ export default function CompetitionReadPage() {
     const now = new Date();
     
     const triggerAutoFinish = () => {
-      if (autoFinishing) return;
+      if (finishingRef.current || autoFinishing) return;
+      finishingRef.current = true;
       setAutoFinishing(true);
       toast({
         title: "Competition has ended",
@@ -125,7 +129,9 @@ export default function CompetitionReadPage() {
   }, [isReadingActive, data?.settings?.competitionEndTime, autoFinishing, hasFinishedReading]);
 
   const handleTimeUp = () => {
-    if (isReadingActive) {
+    if (isReadingActive && !finishingRef.current) {
+      finishingRef.current = true;
+      setAutoFinishing(true);
       toast({
         title: "Time's up!",
         description: "Your reading time has ended.",
@@ -303,7 +309,12 @@ export default function CompetitionReadPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Keep Reading</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => finishReadingMutation.mutate()}
+              onClick={() => {
+                if (finishingRef.current) return;
+                finishingRef.current = true;
+                setAutoFinishing(true);
+                finishReadingMutation.mutate();
+              }}
               disabled={finishReadingMutation.isPending}
             >
               {finishReadingMutation.isPending ? (

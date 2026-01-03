@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +40,7 @@ export default function CompetitionQuestionsPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [showFinishDialog, setShowFinishDialog] = useState(false);
   const [autoSubmitting, setAutoSubmitting] = useState(false);
+  const finishingRef = useRef(false);
 
   const { data, isLoading, refetch } = useQuery<QuestionsData>({
     queryKey: ["/api/student/questions"],
@@ -96,10 +97,15 @@ export default function CompetitionQuestionsPage() {
         description: error.message,
         variant: "destructive",
       });
+      finishingRef.current = false;
+      setAutoSubmitting(false);
     },
   });
 
   const handleTimeUp = () => {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
+    setAutoSubmitting(true);
     toast({
       title: "Time's up!",
       description: "Auto-submitting your answers.",
@@ -134,7 +140,8 @@ export default function CompetitionQuestionsPage() {
     const now = new Date();
     
     const triggerAutoSubmit = () => {
-      if (autoSubmitting) return;
+      if (finishingRef.current || autoSubmitting) return;
+      finishingRef.current = true;
       setAutoSubmitting(true);
       toast({
         title: "Competition has ended",
@@ -335,7 +342,12 @@ export default function CompetitionQuestionsPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Continue Answering</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => finishCompetitionMutation.mutate()}
+              onClick={() => {
+                if (finishingRef.current) return;
+                finishingRef.current = true;
+                setAutoSubmitting(true);
+                finishCompetitionMutation.mutate();
+              }}
               disabled={finishCompetitionMutation.isPending}
             >
               {finishCompetitionMutation.isPending ? (
