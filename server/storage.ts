@@ -392,6 +392,7 @@ export class DatabaseStorage implements IStorage {
     const mcqQuestions = categoryQuestions.filter(q => q.type === "MCQ");
     const mcqTotalCount = mcqQuestions.length;
     let mcqCorrectCount = 0;
+    let mcqWrongCount = 0;
 
     for (const ans of submissionAnswers) {
       if (ans.type === "MCQ") {
@@ -400,6 +401,7 @@ export class DatabaseStorage implements IStorage {
           mcqCorrectCount++;
           await db.update(answers).set({ isCorrect: true }).where(eq(answers.id, ans.id));
         } else if (question) {
+          mcqWrongCount++;
           await db.update(answers).set({ isCorrect: false }).where(eq(answers.id, ans.id));
         }
       }
@@ -411,6 +413,7 @@ export class DatabaseStorage implements IStorage {
     return this.updateSubmission(submissionId, {
       mcqTotalCount,
       mcqCorrectCount,
+      mcqWrongCount,
       autoScore,
       finalScore,
       updatedAt: new Date(),

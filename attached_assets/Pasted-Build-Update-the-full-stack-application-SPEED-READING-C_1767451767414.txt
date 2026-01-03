@@ -1,0 +1,188 @@
+Build / Update the full-stack application:
+
+"SPEED READING COMPETITION PLATFORM"
+
+====================================================
+TECH STACK
+====================================================
+- Node.js + Express backend
+- PostgreSQL + Prisma ORM
+- React (Vite) frontend
+- Tailwind CSS
+- JWT Authentication
+- bcrypt password hashing
+- All time logic controlled by server (UTC)
+- Must run inside Replit
+- Monorepo: /server and /client
+
+====================================================
+ROLES & CATEGORIES
+====================================================
+Roles:
+- STUDENT
+- ADMIN
+
+Categories:
+- kid | teen | adult
+
+====================================================
+STUDENT SYSTEM
+====================================================
+
+REGISTRATION
+Fields:
+name, surname, gender, birthdate, phone, city, country, email, password, category
+After registration:
+- generate unique affiliateCode
+- auto login
+- redirect to Student Dashboard
+
+LOGIN
+email + password
+
+STUDENT DASHBOARD
+Show:
+- Profile info
+- Category
+- Affiliate code (copy + share)
+- Referral points + list
+- Competition info + countdown
+- Assigned book
+- Prize info
+- Submission status
+
+COMPETITION FLOW
+Before start → countdown only
+Start → reading unlocked
+Finish reading → questions unlocked
+Finish exam → store submission
+Finish screen:
+"Submission received. Results will be released soon."
+
+====================================================
+ADMIN SYSTEM
+====================================================
+
+ADMIN DASHBOARD
+
+Submissions Section (Main Feature)
+
+Submissions Table:
+- Student Name
+- Email
+- Category
+- Reading Time
+- Answer Time
+- MCQ Correct / Wrong / Total
+- Auto Score
+- Manual Score
+- Final Score
+- Status
+- View Details
+
+Submission Details View (Answer Analysis Page)
+
+Must show:
+
+A) Summary
+- Student profile
+- Referral data
+- Reading time
+- Answer time
+- MCQ statistics (correct / wrong / total)
+- Score breakdown
+
+B) MCQ Answers
+For each MCQ:
+- Question text
+- Options A/B/C/D
+- Student answer
+- Correct answer
+- Status badge: Correct / Wrong
+
+C) Text Answers (Teacher Analysis)
+For each TEXT question:
+- Question text
+- Student's full written answer
+- Input field: Manual Score
+- Save button
+Teacher can:
+- Read
+- Analyze
+- Score
+
+All answers must be permanently stored.
+
+====================================================
+RANKING & RESULTS
+====================================================
+
+Final Score = MCQ Correct + Manual Score
+
+Ranking rules:
+1) Higher Final Score
+2) Faster reading time
+3) Faster answer time
+4) Earlier submission
+
+Admin can:
+- Recalculate rankings
+- Publish results per category
+- Unpublish results
+
+Students see leaderboard ONLY after publish.
+
+====================================================
+DATABASE REQUIREMENTS
+====================================================
+
+Submission:
+- mcqCorrectCount
+- mcqWrongCount
+- mcqTotalCount
+- autoScore
+- manualScore
+- finalScore
+- status
+
+Answer:
+- questionId
+- type
+- value
+- isCorrect (true/false for MCQ, null for TEXT)
+
+====================================================
+API REQUIREMENTS
+====================================================
+
+Admin:
+GET /api/admin/submissions
+GET /api/admin/submissions/:id
+PUT /api/admin/submissions/:id/manual-score
+PUT /api/admin/results/publish/:category
+POST /api/admin/leaderboard/recalculate
+
+Student:
+GET /api/student/leaderboard/:category (only after publish)
+GET /api/student/my-rank
+
+====================================================
+UI
+====================================================
+
+Admin:
+- Submissions list with MCQ stats
+- Full answer analysis page
+- Manual scoring controls
+- Leaderboard management
+
+Student:
+- Finish screen with "Results coming soon"
+- Submission status
+- Leaderboard after publish
+
+====================================================
+DELIVERABLE
+====================================================
+Fully working app with migrations, seed admin, README, and .env.example.
+Must compile and run on Replit.

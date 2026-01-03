@@ -80,6 +80,7 @@ export const submissions = pgTable("submissions", {
   readingSeconds: integer("reading_seconds"),
   answerSeconds: integer("answer_seconds"),
   mcqCorrectCount: integer("mcq_correct_count").default(0),
+  mcqWrongCount: integer("mcq_wrong_count").default(0),
   mcqTotalCount: integer("mcq_total_count").default(0),
   autoScore: integer("auto_score").default(0),
   manualScore: integer("manual_score").default(0),
