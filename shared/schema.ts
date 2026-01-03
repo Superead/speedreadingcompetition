@@ -44,6 +44,7 @@ export const competitionSettings = pgTable("competition_settings", {
   registrationStartTime: timestamp("registration_start_time"),
   registrationEndTime: timestamp("registration_end_time"),
   competitionStartTime: timestamp("competition_start_time"),
+  competitionEndTime: timestamp("competition_end_time"),
   readingDurationMinutes: integer("reading_duration_minutes").default(30),
   answeringDurationMinutes: integer("answering_duration_minutes").default(15),
   resultsPublishedAt: timestamp("results_published_at"),

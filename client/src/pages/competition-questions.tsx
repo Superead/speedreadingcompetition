@@ -126,6 +126,37 @@ export default function CompetitionQuestionsPage() {
     }
   }, [hasCompletedCompetition, navigate]);
 
+  useEffect(() => {
+    if (!data?.settings?.competitionEndTime) return;
+    
+    const competitionEnd = new Date(data.settings.competitionEndTime);
+    const now = new Date();
+    
+    if (now > competitionEnd) {
+      toast({
+        title: "Competition has ended",
+        description: "Your submission has been saved.",
+        variant: "destructive",
+      });
+      finishCompetitionMutation.mutate();
+      return;
+    }
+    
+    const timeUntilEnd = competitionEnd.getTime() - now.getTime();
+    if (timeUntilEnd > 0) {
+      const timeout = setTimeout(() => {
+        toast({
+          title: "Competition has ended",
+          description: "Your submission has been saved.",
+          variant: "destructive",
+        });
+        finishCompetitionMutation.mutate();
+      }, timeUntilEnd);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [data?.settings?.competitionEndTime]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">

@@ -94,6 +94,37 @@ export default function CompetitionReadPage() {
     }
   }, [hasFinishedReading, navigate]);
 
+  useEffect(() => {
+    if (!isReadingActive || !data?.settings?.competitionEndTime) return;
+    
+    const competitionEnd = new Date(data.settings.competitionEndTime);
+    const now = new Date();
+    
+    if (now > competitionEnd) {
+      toast({
+        title: "Competition has ended",
+        description: "Finishing reading and submitting your attempt.",
+        variant: "destructive",
+      });
+      finishReadingMutation.mutate();
+      return;
+    }
+    
+    const timeUntilEnd = competitionEnd.getTime() - now.getTime();
+    if (timeUntilEnd > 0) {
+      const timeout = setTimeout(() => {
+        toast({
+          title: "Competition has ended",
+          description: "Finishing reading and submitting your attempt.",
+          variant: "destructive",
+        });
+        finishReadingMutation.mutate();
+      }, timeUntilEnd);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [isReadingActive, data?.settings?.competitionEndTime]);
+
   const handleTimeUp = () => {
     if (isReadingActive) {
       toast({

@@ -105,7 +105,25 @@ export default function DashboardPage() {
     if (!data?.settings?.competitionStartTime) return false;
     const now = new Date();
     const start = new Date(data.settings.competitionStartTime);
-    return now >= start && !data.submission?.readingStartAt;
+    if (now < start) return false;
+    if (data?.settings?.competitionEndTime) {
+      const end = new Date(data.settings.competitionEndTime);
+      if (now > end) return false;
+    }
+    return !data.submission?.readingStartAt;
+  };
+
+  const isCompetitionEnded = () => {
+    if (!data?.settings?.competitionEndTime) return false;
+    const now = new Date();
+    const end = new Date(data.settings.competitionEndTime);
+    return now > end;
+  };
+
+  const formatDateTime = (date: Date | string | null | undefined) => {
+    if (!date) return "Not set";
+    const d = new Date(date);
+    return d.toLocaleString();
   };
 
   const hasCompletedCompetition = () => {
@@ -259,15 +277,54 @@ export default function DashboardPage() {
                       )}
                     </div>
                   </div>
+                ) : isCompetitionEnded() ? (
+                  <div className="text-center py-6 space-y-4">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted">
+                      <Clock className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold">Competition Has Ended</h3>
+                      <p className="text-muted-foreground">
+                        The competition period has closed. You can no longer submit entries.
+                      </p>
+                    </div>
+                  </div>
                 ) : data?.settings?.competitionStartTime ? (
                   <div className="space-y-4">
-                    <div className="text-center">
-                      <p className="text-sm text-muted-foreground mb-2">Competition starts in</p>
-                      <CountdownTimer 
-                        targetDate={data.settings.competitionStartTime} 
-                        size="lg"
-                        className="justify-center"
-                      />
+                    {new Date() < new Date(data.settings.competitionStartTime) ? (
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground mb-2">Competition starts in</p>
+                        <CountdownTimer 
+                          targetDate={data.settings.competitionStartTime} 
+                          size="lg"
+                          className="justify-center"
+                        />
+                      </div>
+                    ) : (
+                      <div className="text-center py-2">
+                        <Badge variant="default" className="text-lg px-4 py-2">Competition Open</Badge>
+                      </div>
+                    )}
+                    <Separator />
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Registration opens</p>
+                          <p className="font-medium">{formatDateTime(data.settings.registrationStartTime)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Registration closes</p>
+                          <p className="font-medium">{formatDateTime(data.settings.registrationEndTime)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Competition starts</p>
+                          <p className="font-medium">{formatDateTime(data.settings.competitionStartTime)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Competition closes</p>
+                          <p className="font-medium">{formatDateTime(data.settings.competitionEndTime)}</p>
+                        </div>
+                      </div>
                     </div>
                     <Separator />
                     <div className="grid grid-cols-2 gap-4 text-center">

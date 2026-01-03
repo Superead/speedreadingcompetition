@@ -83,6 +83,7 @@ function SettingsTab() {
     registrationStartTime: "",
     registrationEndTime: "",
     competitionStartTime: "",
+    competitionEndTime: "",
     readingDurationMinutes: 30,
     answeringDurationMinutes: 15,
   });
@@ -112,17 +113,18 @@ function SettingsTab() {
     return d.toISOString().slice(0, 16);
   };
 
-  useState(() => {
+  useEffect(() => {
     if (currentSettings) {
       setFormData({
         registrationStartTime: formatDateForInput(currentSettings.registrationStartTime),
         registrationEndTime: formatDateForInput(currentSettings.registrationEndTime),
         competitionStartTime: formatDateForInput(currentSettings.competitionStartTime),
+        competitionEndTime: formatDateForInput(currentSettings.competitionEndTime),
         readingDurationMinutes: currentSettings.readingDurationMinutes || 30,
         answeringDurationMinutes: currentSettings.answeringDurationMinutes || 15,
       });
     }
-  });
+  }, [currentSettings]);
 
   if (isLoading) {
     return <Skeleton className="h-96 w-full" />;
@@ -179,6 +181,16 @@ function SettingsTab() {
                 value={formData.competitionStartTime}
                 onChange={(e) => setFormData({ ...formData, competitionStartTime: e.target.value })}
                 data-testid="input-competition-start"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="compEnd">Competition End</Label>
+              <Input
+                id="compEnd"
+                type="datetime-local"
+                value={formData.competitionEndTime}
+                onChange={(e) => setFormData({ ...formData, competitionEndTime: e.target.value })}
+                data-testid="input-competition-end"
               />
             </div>
           </div>

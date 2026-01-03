@@ -15,8 +15,27 @@ const settingsUpdateSchema = z.object({
   registrationStartTime: z.string().nullable().optional(),
   registrationEndTime: z.string().nullable().optional(),
   competitionStartTime: z.string().nullable().optional(),
+  competitionEndTime: z.string().nullable().optional(),
   readingDurationMinutes: z.number().min(1).optional(),
   answeringDurationMinutes: z.number().min(1).optional(),
+}).refine((data) => {
+  const regStart = data.registrationStartTime ? new Date(data.registrationStartTime) : null;
+  const regEnd = data.registrationEndTime ? new Date(data.registrationEndTime) : null;
+  const compStart = data.competitionStartTime ? new Date(data.competitionStartTime) : null;
+  const compEnd = data.competitionEndTime ? new Date(data.competitionEndTime) : null;
+
+  if (regStart && regEnd && regStart >= regEnd) {
+    return false;
+  }
+  if (regEnd && compStart && regEnd > compStart) {
+    return false;
+  }
+  if (compStart && compEnd && compStart >= compEnd) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Invalid time sequence. Registration must start before it ends, registration must end before/at competition start, and competition must start before it ends."
 });
 
 const bookSchema = z.object({
@@ -291,11 +310,19 @@ export async function registerRoutes(
       const category = user.category as Category;
 
       const settings = await storage.getCompetitionSettings(category);
+      const now = new Date();
+      
       if (settings?.competitionStartTime) {
-        const now = new Date();
         const start = new Date(settings.competitionStartTime);
         if (now < start) {
           return res.status(400).json({ error: "Competition has not started yet" });
+        }
+      }
+      
+      if (settings?.competitionEndTime) {
+        const end = new Date(settings.competitionEndTime);
+        if (now > end) {
+          return res.status(400).json({ error: "Competition has ended" });
         }
       }
 
@@ -839,6 +866,15 @@ export async function registerRoutes(
       const categoryResult = categorySchema.safeParse(req.params.category);
       if (!categoryResult.success) {
         return res.status(400).json({ error: "Invalid category" });
+      }
+
+      const currentSettings = await storage.getCompetitionSettings(categoryResult.data);
+      if (currentSettings?.competitionEndTime) {
+        const now = new Date();
+        const end = new Date(currentSettings.competitionEndTime);
+        if (now < end) {
+          return res.status(400).json({ error: "Cannot publish results before competition ends" });
+        }
       }
 
       const settings = await storage.publishResults(categoryResult.data);
