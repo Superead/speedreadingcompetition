@@ -1,13 +1,15 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { db } from "./db";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { 
-  registerSchema, loginSchema, adminLoginSchema, 
+  registerSchema, loginSchema, adminLoginSchema, answers,
   type Category, type User 
 } from "@shared/schema";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 
 const categorySchema = z.enum(["kid", "teen", "adult"]);
 
@@ -948,6 +950,681 @@ export async function registerRoutes(
       res.send(csv);
     } catch (error) {
       res.status(500).json({ error: "Failed to export leaderboard" });
+    }
+  });
+
+  // ==================== COMPETITION MANAGEMENT ROUTES ====================
+
+  const competitionCreateSchema = z.object({
+    title: z.string().min(1, "Title is required"),
+    category: categorySchema,
+    description: z.string().optional(),
+    registrationStartTime: z.string().nullable().optional(),
+    registrationEndTime: z.string().nullable().optional(),
+    competitionStartTime: z.string().nullable().optional(),
+    competitionEndTime: z.string().nullable().optional(),
+    readingDurationMinutes: z.number().min(1).optional(),
+    answeringDurationMinutes: z.number().min(1).optional(),
+  });
+
+  const competitionUpdateSchema = competitionCreateSchema.partial();
+
+  // Get all competitions (admin)
+  app.get("/api/admin/competitions", authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+      const allCompetitions = await storage.getAllCompetitions();
+      const competitionsWithDetails = await Promise.all(
+        allCompetitions.map(async (comp) => {
+          const details = await storage.getCompetitionWithDetails(comp.id);
+          return details || comp;
+        })
+      );
+      res.json(competitionsWithDetails);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch competitions" });
+    }
+  });
+
+  // Get single competition (admin)
+  app.get("/api/admin/competitions/:id", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const competition = await storage.getCompetitionWithDetails(req.params.id);
+      if (!competition) {
+        return res.status(404).json({ error: "Competition not found" });
+      }
+      res.json(competition);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch competition" });
+    }
+  });
+
+  // Create competition
+  app.post("/api/admin/competitions", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const data = competitionCreateSchema.parse(req.body);
+      const competition = await storage.createCompetition({
+        title: data.title,
+        category: data.category,
+        description: data.description || null,
+        registrationStartTime: data.registrationStartTime ? new Date(data.registrationStartTime) : null,
+        registrationEndTime: data.registrationEndTime ? new Date(data.registrationEndTime) : null,
+        competitionStartTime: data.competitionStartTime ? new Date(data.competitionStartTime) : null,
+        competitionEndTime: data.competitionEndTime ? new Date(data.competitionEndTime) : null,
+        readingDurationMinutes: data.readingDurationMinutes || 30,
+        answeringDurationMinutes: data.answeringDurationMinutes || 15,
+        status: "DRAFT",
+      });
+      res.json(competition);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      res.status(500).json({ error: "Failed to create competition" });
+    }
+  });
+
+  // Update competition
+  app.put("/api/admin/competitions/:id", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const data = competitionUpdateSchema.parse(req.body);
+      const updateData: any = { ...data };
+      
+      if (data.registrationStartTime !== undefined) {
+        updateData.registrationStartTime = data.registrationStartTime ? new Date(data.registrationStartTime) : null;
+      }
+      if (data.registrationEndTime !== undefined) {
+        updateData.registrationEndTime = data.registrationEndTime ? new Date(data.registrationEndTime) : null;
+      }
+      if (data.competitionStartTime !== undefined) {
+        updateData.competitionStartTime = data.competitionStartTime ? new Date(data.competitionStartTime) : null;
+      }
+      if (data.competitionEndTime !== undefined) {
+        updateData.competitionEndTime = data.competitionEndTime ? new Date(data.competitionEndTime) : null;
+      }
+
+      const competition = await storage.updateCompetition(req.params.id, updateData);
+      if (!competition) {
+        return res.status(404).json({ error: "Competition not found" });
+      }
+      res.json(competition);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      res.status(500).json({ error: "Failed to update competition" });
+    }
+  });
+
+  // Delete competition
+  app.delete("/api/admin/competitions/:id", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      await storage.deleteCompetition(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete competition" });
+    }
+  });
+
+  // Publish competition (make active)
+  app.put("/api/admin/competitions/:id/publish", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const competition = await storage.publishCompetition(req.params.id);
+      if (!competition) {
+        return res.status(404).json({ error: "Competition not found" });
+      }
+      res.json(competition);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to publish competition" });
+    }
+  });
+
+  // Close competition
+  app.put("/api/admin/competitions/:id/close", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const competition = await storage.closeCompetition(req.params.id);
+      if (!competition) {
+        return res.status(404).json({ error: "Competition not found" });
+      }
+      res.json(competition);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to close competition" });
+    }
+  });
+
+  // Publish competition results
+  app.put("/api/admin/competitions/:id/results/publish", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const existing = await storage.getCompetition(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Competition not found" });
+      }
+      if (existing.competitionEndTime) {
+        const now = new Date();
+        const end = new Date(existing.competitionEndTime);
+        if (now < end) {
+          return res.status(400).json({ error: "Cannot publish results before competition ends" });
+        }
+      }
+      const competition = await storage.publishCompetitionResults(req.params.id);
+      res.json(competition);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to publish results" });
+    }
+  });
+
+  // Unpublish competition results
+  app.put("/api/admin/competitions/:id/results/unpublish", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const competition = await storage.unpublishCompetitionResults(req.params.id);
+      if (!competition) {
+        return res.status(404).json({ error: "Competition not found" });
+      }
+      res.json(competition);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to unpublish results" });
+    }
+  });
+
+  // Competition book management
+  app.get("/api/admin/competitions/:id/book", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const book = await storage.getCompetitionBook(req.params.id);
+      res.json(book || null);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch book" });
+    }
+  });
+
+  app.post("/api/admin/competitions/:id/book", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const data = bookSchema.parse(req.body);
+      const book = await storage.upsertCompetitionBook(req.params.id, data);
+      res.json(book);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      res.status(500).json({ error: "Failed to save book" });
+    }
+  });
+
+  app.delete("/api/admin/competitions/:id/book", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      await storage.deleteCompetitionBook(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete book" });
+    }
+  });
+
+  // Competition questions management
+  app.get("/api/admin/competitions/:id/questions", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const questions = await storage.getCompetitionQuestions(req.params.id);
+      res.json(questions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch questions" });
+    }
+  });
+
+  app.post("/api/admin/competitions/:id/questions", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const data = questionCreateSchema.parse(req.body);
+      const question = await storage.createCompetitionQuestion({
+        competitionId: req.params.id,
+        type: data.type,
+        prompt: data.prompt,
+        optionsJson: data.optionsJson || null,
+        correctAnswer: data.correctAnswer || null,
+      });
+      res.json(question);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      res.status(500).json({ error: "Failed to create question" });
+    }
+  });
+
+  app.put("/api/admin/competitions/questions/:questionId", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const data = questionCreateSchema.parse(req.body);
+      const question = await storage.updateCompetitionQuestion(req.params.questionId, {
+        type: data.type,
+        prompt: data.prompt,
+        optionsJson: data.optionsJson || null,
+        correctAnswer: data.correctAnswer || null,
+      });
+      if (!question) {
+        return res.status(404).json({ error: "Question not found" });
+      }
+      res.json(question);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      res.status(500).json({ error: "Failed to update question" });
+    }
+  });
+
+  app.delete("/api/admin/competitions/questions/:questionId", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      await storage.deleteCompetitionQuestion(req.params.questionId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete question" });
+    }
+  });
+
+  // Competition submissions and leaderboard
+  app.get("/api/admin/competitions/:id/submissions", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const submissions = await storage.getCompetitionSubmissions(req.params.id);
+      res.json(submissions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch submissions" });
+    }
+  });
+
+  app.get("/api/admin/competitions/:id/leaderboard", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const leaderboard = await storage.getAdminCompetitionLeaderboard(req.params.id);
+      res.json(leaderboard);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch leaderboard" });
+    }
+  });
+
+  // ==================== STUDENT COMPETITION ROUTES ====================
+
+  // Get available competitions for student's category
+  app.get("/api/student/competitions", authMiddleware, studentMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const user = req.user!;
+      if (!user.category) {
+        return res.status(400).json({ error: "User category not set" });
+      }
+
+      const now = new Date();
+      const activeCompetitions = await storage.getActiveCompetitions(user.category);
+      
+      const availableCompetitions = [];
+      const registeredIds = new Set<string>();
+      
+      const userRegistrations = await storage.getUserRegistrations(user.id);
+      for (const reg of userRegistrations) {
+        registeredIds.add(reg.competitionId);
+      }
+
+      for (const comp of activeCompetitions) {
+        const isRegistered = registeredIds.has(comp.id);
+        const canRegister = comp.registrationStartTime && comp.registrationEndTime
+          ? now >= new Date(comp.registrationStartTime) && now <= new Date(comp.registrationEndTime)
+          : false;
+
+        availableCompetitions.push({
+          ...comp,
+          isRegistered,
+          canRegister: !isRegistered && canRegister,
+        });
+      }
+
+      res.json(availableCompetitions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch competitions" });
+    }
+  });
+
+  // Get student's registered competitions
+  app.get("/api/student/my-competitions", authMiddleware, studentMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const user = req.user!;
+      const registrations = await storage.getUserRegistrations(user.id);
+      
+      const competitionsWithStatus = await Promise.all(
+        registrations.map(async (reg) => {
+          const competition = await storage.getCompetition(reg.competitionId);
+          if (!competition) return null;
+
+          const submission = await storage.getCompetitionSubmission(reg.competitionId, user.id);
+          
+          let status = "registered";
+          if (submission?.answerEndAt) {
+            status = "submitted";
+          } else if (submission?.readingEndAt) {
+            status = "answering";
+          } else if (submission?.readingStartAt) {
+            status = "reading";
+          }
+
+          if (competition.status === "CLOSED") {
+            status = "closed";
+          }
+
+          return {
+            ...competition,
+            registeredAt: reg.registeredAt,
+            submissionStatus: status,
+            submission,
+          };
+        })
+      );
+
+      res.json(competitionsWithStatus.filter(Boolean));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch my competitions" });
+    }
+  });
+
+  // Get single competition details for student
+  app.get("/api/student/competitions/:id", authMiddleware, studentMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const user = req.user!;
+      const competition = await storage.getCompetition(req.params.id);
+      
+      if (!competition) {
+        return res.status(404).json({ error: "Competition not found" });
+      }
+
+      if (competition.category !== user.category) {
+        return res.status(403).json({ error: "Competition not in your category" });
+      }
+
+      const registration = await storage.getRegistration(competition.id, user.id);
+      const submission = await storage.getCompetitionSubmission(competition.id, user.id);
+      const book = await storage.getCompetitionBook(competition.id);
+
+      res.json({
+        ...competition,
+        isRegistered: !!registration,
+        submission,
+        book,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch competition" });
+    }
+  });
+
+  // Register for competition
+  app.post("/api/student/competitions/:id/register", authMiddleware, studentMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const user = req.user!;
+      const competition = await storage.getCompetition(req.params.id);
+
+      if (!competition) {
+        return res.status(404).json({ error: "Competition not found" });
+      }
+
+      if (competition.category !== user.category) {
+        return res.status(403).json({ error: "Competition not in your category" });
+      }
+
+      if (competition.status !== "ACTIVE") {
+        return res.status(400).json({ error: "Competition is not active" });
+      }
+
+      const now = new Date();
+      if (competition.registrationStartTime && now < new Date(competition.registrationStartTime)) {
+        return res.status(400).json({ error: "Registration has not started yet" });
+      }
+      if (competition.registrationEndTime && now > new Date(competition.registrationEndTime)) {
+        return res.status(400).json({ error: "Registration has ended" });
+      }
+
+      const existing = await storage.getRegistration(competition.id, user.id);
+      if (existing) {
+        return res.status(400).json({ error: "Already registered for this competition" });
+      }
+
+      const registration = await storage.registerForCompetition(competition.id, user.id);
+      res.json(registration);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to register for competition" });
+    }
+  });
+
+  // Start reading for competition
+  app.post("/api/student/competitions/:id/start-reading", authMiddleware, studentMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const user = req.user!;
+      const competition = await storage.getCompetition(req.params.id);
+
+      if (!competition) {
+        return res.status(404).json({ error: "Competition not found" });
+      }
+
+      const registration = await storage.getRegistration(competition.id, user.id);
+      if (!registration) {
+        return res.status(400).json({ error: "Not registered for this competition" });
+      }
+
+      const now = new Date();
+      if (competition.competitionStartTime && now < new Date(competition.competitionStartTime)) {
+        return res.status(400).json({ error: "Competition has not started yet" });
+      }
+      if (competition.competitionEndTime && now > new Date(competition.competitionEndTime)) {
+        return res.status(400).json({ error: "Competition has ended" });
+      }
+
+      let submission = await storage.getCompetitionSubmission(competition.id, user.id);
+      if (submission?.readingStartAt) {
+        return res.status(400).json({ error: "Reading already started" });
+      }
+
+      submission = await storage.createSubmission({
+        userId: user.id,
+        competitionId: competition.id,
+        category: competition.category,
+        readingStartAt: now,
+      });
+
+      res.json(submission);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to start reading" });
+    }
+  });
+
+  // Finish reading for competition
+  app.post("/api/student/competitions/:id/finish-reading", authMiddleware, studentMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const user = req.user!;
+      const competition = await storage.getCompetition(req.params.id);
+
+      if (!competition) {
+        return res.status(404).json({ error: "Competition not found" });
+      }
+
+      const submission = await storage.getCompetitionSubmission(competition.id, user.id);
+      if (!submission) {
+        return res.status(400).json({ error: "No submission found" });
+      }
+      if (submission.readingEndAt) {
+        return res.status(400).json({ error: "Reading already finished" });
+      }
+
+      const now = new Date();
+      const readingSeconds = submission.readingStartAt 
+        ? Math.floor((now.getTime() - new Date(submission.readingStartAt).getTime()) / 1000)
+        : 0;
+
+      const updated = await storage.updateSubmission(submission.id, {
+        readingEndAt: now,
+        answerStartAt: now,
+        readingSeconds,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to finish reading" });
+    }
+  });
+
+  // Get competition questions for student
+  app.get("/api/student/competitions/:id/questions", authMiddleware, studentMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const user = req.user!;
+      const competition = await storage.getCompetition(req.params.id);
+
+      if (!competition) {
+        return res.status(404).json({ error: "Competition not found" });
+      }
+
+      const submission = await storage.getCompetitionSubmission(competition.id, user.id);
+      if (!submission?.readingEndAt) {
+        return res.status(400).json({ error: "Must finish reading first" });
+      }
+
+      const questions = await storage.getCompetitionQuestions(competition.id);
+      const existingAnswers = await storage.getAnswers(submission.id);
+
+      const questionsWithAnswers = questions.map((q) => {
+        const answer = existingAnswers.find((a) => a.competitionQuestionId === q.id);
+        return {
+          id: q.id,
+          type: q.type,
+          prompt: q.prompt,
+          optionsJson: q.optionsJson,
+          currentAnswer: answer?.value || null,
+        };
+      });
+
+      res.json({
+        questions: questionsWithAnswers,
+        submission,
+        competition,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch questions" });
+    }
+  });
+
+  // Submit answer for competition question
+  app.post("/api/student/competitions/:id/answer", authMiddleware, studentMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const user = req.user!;
+      const { questionId, value } = req.body;
+
+      const competition = await storage.getCompetition(req.params.id);
+      if (!competition) {
+        return res.status(404).json({ error: "Competition not found" });
+      }
+
+      if (competition.competitionEndTime) {
+        const now = new Date();
+        const end = new Date(competition.competitionEndTime);
+        if (now > end) {
+          return res.status(400).json({ error: "Competition has ended" });
+        }
+      }
+
+      const submission = await storage.getCompetitionSubmission(competition.id, user.id);
+      if (!submission || submission.answerEndAt) {
+        return res.status(400).json({ error: "Cannot submit answers" });
+      }
+
+      const question = await storage.getCompetitionQuestion(questionId);
+      if (!question || question.competitionId !== competition.id) {
+        return res.status(400).json({ error: "Invalid question" });
+      }
+
+      // Find or create answer - we need to handle competitionQuestionId differently
+      const existingAnswers = await storage.getAnswers(submission.id);
+      const existingAnswer = existingAnswers.find((a) => a.competitionQuestionId === questionId);
+
+      if (existingAnswer) {
+        await db.update(answers).set({ value }).where(eq(answers.id, existingAnswer.id));
+      } else {
+        await db.insert(answers).values({
+          submissionId: submission.id,
+          questionId: questionId, // Using questionId for legacy compatibility
+          competitionQuestionId: questionId,
+          type: question.type,
+          value,
+        });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to submit answer" });
+    }
+  });
+
+  // Finish competition
+  app.post("/api/student/competitions/:id/finish", authMiddleware, studentMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const user = req.user!;
+      const competition = await storage.getCompetition(req.params.id);
+
+      if (!competition) {
+        return res.status(404).json({ error: "Competition not found" });
+      }
+
+      const submission = await storage.getCompetitionSubmission(competition.id, user.id);
+      if (!submission) {
+        return res.status(400).json({ error: "No submission found" });
+      }
+      if (submission.answerEndAt) {
+        return res.status(400).json({ error: "Competition already finished" });
+      }
+
+      const now = new Date();
+      const answerSeconds = submission.answerStartAt
+        ? Math.floor((now.getTime() - new Date(submission.answerStartAt).getTime()) / 1000)
+        : 0;
+
+      // Calculate scores
+      const questions = await storage.getCompetitionQuestions(competition.id);
+      const submissionAnswers = await storage.getAnswers(submission.id);
+
+      const mcqQuestions = questions.filter((q) => q.type === "MCQ");
+      let mcqCorrectCount = 0;
+      let mcqWrongCount = 0;
+
+      for (const q of mcqQuestions) {
+        const answer = submissionAnswers.find((a) => a.competitionQuestionId === q.id);
+        if (answer?.value === q.correctAnswer) {
+          mcqCorrectCount++;
+        } else if (answer?.value) {
+          mcqWrongCount++;
+        }
+      }
+
+      const autoScore = mcqCorrectCount;
+      const finalScore = autoScore;
+
+      const updated = await storage.updateSubmission(submission.id, {
+        answerEndAt: now,
+        answerSeconds,
+        mcqTotalCount: mcqQuestions.length,
+        mcqCorrectCount,
+        mcqWrongCount,
+        autoScore,
+        finalScore,
+        status: "SUBMITTED",
+      });
+
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to finish competition" });
+    }
+  });
+
+  // Get competition leaderboard (public if results published)
+  app.get("/api/competitions/:id/leaderboard", async (req: Request, res) => {
+    try {
+      const competition = await storage.getCompetition(req.params.id);
+      if (!competition) {
+        return res.status(404).json({ error: "Competition not found" });
+      }
+
+      if (!competition.resultsPublishedAt) {
+        return res.status(403).json({ error: "Results not yet published" });
+      }
+
+      const leaderboard = await storage.getCompetitionLeaderboard(req.params.id);
+      res.json(leaderboard);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch leaderboard" });
     }
   });
 

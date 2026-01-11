@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, pgEnum, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -8,6 +8,7 @@ export const categoryEnum = pgEnum("category", ["kid", "teen", "adult"]);
 export const genderEnum = pgEnum("gender", ["male", "female", "other"]);
 export const questionTypeEnum = pgEnum("question_type", ["MCQ", "TEXT"]);
 export const submissionStatusEnum = pgEnum("submission_status", ["SUBMITTED", "REVIEWED", "FINALIZED"]);
+export const competitionStatusEnum = pgEnum("competition_status", ["DRAFT", "ACTIVE", "CLOSED"]);
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -27,16 +28,6 @@ export const users = pgTable("users", {
   referralPoints: integer("referral_points").default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
-
-export const usersRelations = relations(users, ({ one, many }) => ({
-  referrer: one(users, {
-    fields: [users.referrerId],
-    references: [users.id],
-    relationName: "referrals",
-  }),
-  referrals: many(users, { relationName: "referrals" }),
-  submissions: many(submissions),
-}));
 
 export const competitionSettings = pgTable("competition_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -70,9 +61,55 @@ export const questions = pgTable("questions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const competitions = pgTable("competitions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  category: categoryEnum("category").notNull(),
+  description: text("description"),
+  registrationStartTime: timestamp("registration_start_time"),
+  registrationEndTime: timestamp("registration_end_time"),
+  competitionStartTime: timestamp("competition_start_time"),
+  competitionEndTime: timestamp("competition_end_time"),
+  readingDurationMinutes: integer("reading_duration_minutes").default(30),
+  answeringDurationMinutes: integer("answering_duration_minutes").default(15),
+  status: competitionStatusEnum("status").notNull().default("DRAFT"),
+  resultsPublishedAt: timestamp("results_published_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const competitionBooks = pgTable("competition_books", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  competitionId: varchar("competition_id").notNull().references(() => competitions.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  fileUrl: text("file_url"),
+  content: text("content"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const competitionQuestions = pgTable("competition_questions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  competitionId: varchar("competition_id").notNull().references(() => competitions.id, { onDelete: "cascade" }),
+  type: questionTypeEnum("type").notNull(),
+  prompt: text("prompt").notNull(),
+  optionsJson: text("options_json"),
+  correctAnswer: text("correct_answer"),
+  maxPoints: integer("max_points").default(1),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const competitionRegistrations = pgTable("competition_registrations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  competitionId: varchar("competition_id").notNull().references(() => competitions.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  registeredAt: timestamp("registered_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("competition_user_unique").on(table.competitionId, table.userId),
+]);
+
 export const submissions = pgTable("submissions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
+  competitionId: varchar("competition_id").references(() => competitions.id),
   category: categoryEnum("category").notNull(),
   readingStartAt: timestamp("reading_start_at"),
   readingEndAt: timestamp("reading_end_at"),
@@ -91,23 +128,77 @@ export const submissions = pgTable("submissions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const submissionsRelations = relations(submissions, ({ one, many }) => ({
-  user: one(users, {
-    fields: [submissions.userId],
-    references: [users.id],
-  }),
-  answers: many(answers),
-}));
-
 export const answers = pgTable("answers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   submissionId: varchar("submission_id").notNull().references(() => submissions.id),
   questionId: varchar("question_id").notNull().references(() => questions.id),
+  competitionQuestionId: varchar("competition_question_id").references(() => competitionQuestions.id),
   type: questionTypeEnum("type").notNull(),
   value: text("value"),
   isCorrect: boolean("is_correct"),
   points: integer("points").default(0),
 });
+
+export const prizes = pgTable("prizes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  category: categoryEnum("category").notNull().unique(),
+  content: text("content"),
+});
+
+export const usersRelations = relations(users, ({ one, many }) => ({
+  referrer: one(users, {
+    fields: [users.referrerId],
+    references: [users.id],
+    relationName: "referrals",
+  }),
+  referrals: many(users, { relationName: "referrals" }),
+  submissions: many(submissions),
+  registrations: many(competitionRegistrations),
+}));
+
+export const competitionsRelations = relations(competitions, ({ many }) => ({
+  books: many(competitionBooks),
+  questions: many(competitionQuestions),
+  registrations: many(competitionRegistrations),
+  submissions: many(submissions),
+}));
+
+export const competitionBooksRelations = relations(competitionBooks, ({ one }) => ({
+  competition: one(competitions, {
+    fields: [competitionBooks.competitionId],
+    references: [competitions.id],
+  }),
+}));
+
+export const competitionQuestionsRelations = relations(competitionQuestions, ({ one }) => ({
+  competition: one(competitions, {
+    fields: [competitionQuestions.competitionId],
+    references: [competitions.id],
+  }),
+}));
+
+export const competitionRegistrationsRelations = relations(competitionRegistrations, ({ one }) => ({
+  competition: one(competitions, {
+    fields: [competitionRegistrations.competitionId],
+    references: [competitions.id],
+  }),
+  user: one(users, {
+    fields: [competitionRegistrations.userId],
+    references: [users.id],
+  }),
+}));
+
+export const submissionsRelations = relations(submissions, ({ one, many }) => ({
+  user: one(users, {
+    fields: [submissions.userId],
+    references: [users.id],
+  }),
+  competition: one(competitions, {
+    fields: [submissions.competitionId],
+    references: [competitions.id],
+  }),
+  answers: many(answers),
+}));
 
 export const answersRelations = relations(answers, ({ one }) => ({
   submission: one(submissions, {
@@ -118,13 +209,11 @@ export const answersRelations = relations(answers, ({ one }) => ({
     fields: [answers.questionId],
     references: [questions.id],
   }),
+  competitionQuestion: one(competitionQuestions, {
+    fields: [answers.competitionQuestionId],
+    references: [competitionQuestions.id],
+  }),
 }));
-
-export const prizes = pgTable("prizes", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  category: categoryEnum("category").notNull().unique(),
-  content: text("content"),
-});
 
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -170,6 +259,26 @@ export const insertQuestionSchema = createInsertSchema(questions).omit({
   createdAt: true,
 });
 
+export const insertCompetitionSchema = createInsertSchema(competitions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCompetitionBookSchema = createInsertSchema(competitionBooks).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCompetitionQuestionSchema = createInsertSchema(competitionQuestions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCompetitionRegistrationSchema = createInsertSchema(competitionRegistrations).omit({
+  id: true,
+  registeredAt: true,
+});
+
 export const insertSubmissionSchema = createInsertSchema(submissions).omit({
   id: true,
   createdAt: true,
@@ -199,6 +308,18 @@ export type InsertBook = z.infer<typeof insertBookSchema>;
 export type Question = typeof questions.$inferSelect;
 export type InsertQuestion = z.infer<typeof insertQuestionSchema>;
 
+export type Competition = typeof competitions.$inferSelect;
+export type InsertCompetition = z.infer<typeof insertCompetitionSchema>;
+
+export type CompetitionBook = typeof competitionBooks.$inferSelect;
+export type InsertCompetitionBook = z.infer<typeof insertCompetitionBookSchema>;
+
+export type CompetitionQuestion = typeof competitionQuestions.$inferSelect;
+export type InsertCompetitionQuestion = z.infer<typeof insertCompetitionQuestionSchema>;
+
+export type CompetitionRegistration = typeof competitionRegistrations.$inferSelect;
+export type InsertCompetitionRegistration = z.infer<typeof insertCompetitionRegistrationSchema>;
+
 export type Submission = typeof submissions.$inferSelect;
 export type InsertSubmission = z.infer<typeof insertSubmissionSchema>;
 
@@ -213,3 +334,4 @@ export type Role = "STUDENT" | "ADMIN";
 export type Gender = "male" | "female" | "other";
 export type QuestionType = "MCQ" | "TEXT";
 export type SubmissionStatus = "SUBMITTED" | "REVIEWED" | "FINALIZED";
+export type CompetitionStatus = "DRAFT" | "ACTIVE" | "CLOSED";

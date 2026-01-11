@@ -1,0 +1,153 @@
+Upgrade the platform from single-competition mode to MULTI-COMPETITION architecture.
+
+CORE CONCEPT
+The system must support unlimited competitions.
+Each competition belongs to ONE category (kid, teen, adult).
+A student can participate in each competition at most ONCE.
+
+=================================================
+NEW DATABASE MODELS
+=================================================
+
+Competition
+- id
+- title
+- category
+- description
+- registrationStartTime
+- registrationEndTime
+- competitionStartTime
+- competitionEndTime
+- readingDurationMinutes
+- answeringDurationMinutes
+- status (DRAFT | ACTIVE | CLOSED)
+- createdAt
+
+CompetitionBook
+- id
+- competitionId
+- title
+- fileUrl
+
+CompetitionQuestion
+- id
+- competitionId
+- type (MCQ | TEXT)
+- prompt
+- optionsJson
+- correctAnswer
+- maxPoints
+
+CompetitionRegistration
+- id
+- competitionId
+- userId
+- registeredAt
+- UNIQUE(competitionId, userId)
+
+Submission
+- id
+- competitionId
+- userId
+- readingStartAt
+- readingEndAt
+- answerStartAt
+- answerEndAt
+- readingSeconds
+- answerSeconds
+- mcqCorrectCount
+- mcqWrongCount
+- mcqTotalCount
+- autoScore
+- manualScore
+- finalScore
+- status
+- createdAt
+
+=================================================
+RULES
+=================================================
+
+1. Student can register only ONCE per competition.
+2. Student can participate in multiple competitions over time.
+3. Student dashboard must list AVAILABLE competitions for their category.
+4. Student dashboard must list COMPLETED competitions for that student.
+5. Admin can create, edit, publish and close competitions independently.
+
+=================================================
+STUDENT FLOW (UPDATED)
+=================================================
+
+Student Dashboard:
+
+Section: Available Competitions
+- List all competitions:
+   WHERE category = student.category
+   AND now BETWEEN registrationStartTime AND registrationEndTime
+   AND NOT EXISTS CompetitionRegistration for this student
+
+Section: My Competitions
+- List competitions where student is already registered
+- Show status: Registered | In Progress | Submitted | Closed
+- Show buttons based on phase
+
+Registration Button:
+- Registers into CompetitionRegistration
+- Prevent duplicate registration
+
+Competition Flow:
+- All reading, answering, submissions tied to competitionId
+
+=================================================
+ADMIN FLOW (UPDATED)
+=================================================
+
+Admin Dashboard:
+
+Competition Manager:
+- Create competition
+- Edit competition
+- Assign category
+- Set all time windows
+- Assign book to competition
+- Assign questions to competition
+- Publish / Close competition
+
+Submissions & Leaderboard:
+- Filter by competitionId
+- Each competition has its own leaderboard
+
+=================================================
+API UPDATES
+=================================================
+
+POST /api/admin/competitions
+PUT /api/admin/competitions/:id
+GET /api/admin/competitions
+PUT /api/admin/competitions/:id/publish
+PUT /api/admin/competitions/:id/close
+
+POST /api/student/competitions/:id/register
+GET /api/student/competitions
+GET /api/student/my-competitions
+GET /api/student/competitions/:id
+POST /api/student/competitions/:id/start-reading
+POST /api/student/competitions/:id/finish-reading
+POST /api/student/competitions/:id/finish-competition
+
+=================================================
+MIGRATION REQUIREMENTS
+=================================================
+
+Migrate existing data into new Competition structure.
+Add UNIQUE constraint: CompetitionRegistration(competitionId, userId)
+
+=================================================
+RESULT
+=================================================
+
+The platform becomes a true championship system:
+- Multiple events
+- Repeat participation over time
+- One attempt per event
+- Independent leaderboards and results

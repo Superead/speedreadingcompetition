@@ -1,12 +1,16 @@
 import { 
   users, competitionSettings, books, questions, submissions, answers, prizes,
+  competitions, competitionBooks, competitionQuestions, competitionRegistrations,
   type User, type InsertUser, type CompetitionSettings, type InsertCompetitionSettings,
   type Book, type InsertBook, type Question, type InsertQuestion,
   type Submission, type InsertSubmission, type Answer, type InsertAnswer,
-  type Prize, type InsertPrize, type Category, type SubmissionStatus
+  type Prize, type InsertPrize, type Category, type SubmissionStatus,
+  type Competition, type InsertCompetition, type CompetitionBook, type InsertCompetitionBook,
+  type CompetitionQuestion, type InsertCompetitionQuestion,
+  type CompetitionRegistration, type InsertCompetitionRegistration, type CompetitionStatus
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, sql } from "drizzle-orm";
+import { eq, and, desc, asc, sql, ne, gte, lte, notInArray, inArray } from "drizzle-orm";
 
 export interface SubmissionWithUser extends Submission {
   userName: string;
@@ -30,6 +34,12 @@ export interface LeaderboardEntry {
   readingSeconds: number | null;
   answerSeconds: number | null;
   userId: string;
+}
+
+export interface CompetitionWithDetails extends Competition {
+  book?: CompetitionBook;
+  questionCount: number;
+  registrationCount: number;
 }
 
 export interface IStorage {
@@ -81,6 +91,44 @@ export interface IStorage {
 
   publishResults(category: Category): Promise<CompetitionSettings>;
   unpublishResults(category: Category): Promise<CompetitionSettings>;
+
+  // Competition management
+  getCompetition(id: string): Promise<Competition | undefined>;
+  getCompetitionWithDetails(id: string): Promise<CompetitionWithDetails | undefined>;
+  getAllCompetitions(): Promise<Competition[]>;
+  getCompetitionsByCategory(category: Category): Promise<Competition[]>;
+  getActiveCompetitions(category: Category): Promise<Competition[]>;
+  createCompetition(data: InsertCompetition): Promise<Competition>;
+  updateCompetition(id: string, data: Partial<InsertCompetition>): Promise<Competition | undefined>;
+  deleteCompetition(id: string): Promise<void>;
+  publishCompetition(id: string): Promise<Competition | undefined>;
+  closeCompetition(id: string): Promise<Competition | undefined>;
+  publishCompetitionResults(id: string): Promise<Competition | undefined>;
+  unpublishCompetitionResults(id: string): Promise<Competition | undefined>;
+
+  // Competition Books
+  getCompetitionBook(competitionId: string): Promise<CompetitionBook | undefined>;
+  upsertCompetitionBook(competitionId: string, data: Partial<InsertCompetitionBook>): Promise<CompetitionBook>;
+  deleteCompetitionBook(competitionId: string): Promise<void>;
+
+  // Competition Questions
+  getCompetitionQuestions(competitionId: string): Promise<CompetitionQuestion[]>;
+  getCompetitionQuestion(id: string): Promise<CompetitionQuestion | undefined>;
+  createCompetitionQuestion(data: InsertCompetitionQuestion): Promise<CompetitionQuestion>;
+  updateCompetitionQuestion(id: string, data: Partial<InsertCompetitionQuestion>): Promise<CompetitionQuestion | undefined>;
+  deleteCompetitionQuestion(id: string): Promise<void>;
+
+  // Competition Registrations
+  getRegistration(competitionId: string, userId: string): Promise<CompetitionRegistration | undefined>;
+  getUserRegistrations(userId: string): Promise<CompetitionRegistration[]>;
+  getCompetitionRegistrations(competitionId: string): Promise<CompetitionRegistration[]>;
+  registerForCompetition(competitionId: string, userId: string): Promise<CompetitionRegistration>;
+
+  // Competition Submissions
+  getCompetitionSubmission(competitionId: string, userId: string): Promise<Submission | undefined>;
+  getCompetitionSubmissions(competitionId: string): Promise<SubmissionWithUser[]>;
+  getCompetitionLeaderboard(competitionId: string): Promise<LeaderboardEntry[]>;
+  getAdminCompetitionLeaderboard(competitionId: string): Promise<LeaderboardEntry[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -488,6 +536,256 @@ export class DatabaseStorage implements IStorage {
       .where(eq(competitionSettings.category, category))
       .returning();
     return updated;
+  }
+
+  // Competition management
+  async getCompetition(id: string): Promise<Competition | undefined> {
+    const [competition] = await db.select().from(competitions).where(eq(competitions.id, id));
+    return competition || undefined;
+  }
+
+  async getCompetitionWithDetails(id: string): Promise<CompetitionWithDetails | undefined> {
+    const competition = await this.getCompetition(id);
+    if (!competition) return undefined;
+
+    const book = await this.getCompetitionBook(id);
+    const questionsResult = await db.select().from(competitionQuestions).where(eq(competitionQuestions.competitionId, id));
+    const registrationsResult = await db.select().from(competitionRegistrations).where(eq(competitionRegistrations.competitionId, id));
+
+    return {
+      ...competition,
+      book,
+      questionCount: questionsResult.length,
+      registrationCount: registrationsResult.length,
+    };
+  }
+
+  async getAllCompetitions(): Promise<Competition[]> {
+    return db.select().from(competitions).orderBy(desc(competitions.createdAt));
+  }
+
+  async getCompetitionsByCategory(category: Category): Promise<Competition[]> {
+    return db.select().from(competitions)
+      .where(eq(competitions.category, category))
+      .orderBy(desc(competitions.createdAt));
+  }
+
+  async getActiveCompetitions(category: Category): Promise<Competition[]> {
+    return db.select().from(competitions)
+      .where(and(
+        eq(competitions.category, category),
+        eq(competitions.status, "ACTIVE")
+      ))
+      .orderBy(desc(competitions.createdAt));
+  }
+
+  async createCompetition(data: InsertCompetition): Promise<Competition> {
+    const [competition] = await db.insert(competitions).values(data).returning();
+    return competition;
+  }
+
+  async updateCompetition(id: string, data: Partial<InsertCompetition>): Promise<Competition | undefined> {
+    const [competition] = await db.update(competitions).set(data).where(eq(competitions.id, id)).returning();
+    return competition || undefined;
+  }
+
+  async deleteCompetition(id: string): Promise<void> {
+    await db.delete(competitions).where(eq(competitions.id, id));
+  }
+
+  async publishCompetition(id: string): Promise<Competition | undefined> {
+    return this.updateCompetition(id, { status: "ACTIVE" });
+  }
+
+  async closeCompetition(id: string): Promise<Competition | undefined> {
+    return this.updateCompetition(id, { status: "CLOSED" });
+  }
+
+  async publishCompetitionResults(id: string): Promise<Competition | undefined> {
+    const [updated] = await db.update(competitions)
+      .set({ resultsPublishedAt: new Date() })
+      .where(eq(competitions.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async unpublishCompetitionResults(id: string): Promise<Competition | undefined> {
+    const [updated] = await db.update(competitions)
+      .set({ resultsPublishedAt: null })
+      .where(eq(competitions.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  // Competition Books
+  async getCompetitionBook(competitionId: string): Promise<CompetitionBook | undefined> {
+    const [book] = await db.select().from(competitionBooks).where(eq(competitionBooks.competitionId, competitionId));
+    return book || undefined;
+  }
+
+  async upsertCompetitionBook(competitionId: string, data: Partial<InsertCompetitionBook>): Promise<CompetitionBook> {
+    const existing = await this.getCompetitionBook(competitionId);
+    if (existing) {
+      const [updated] = await db.update(competitionBooks)
+        .set(data)
+        .where(eq(competitionBooks.competitionId, competitionId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(competitionBooks)
+        .values({ ...data, competitionId } as InsertCompetitionBook)
+        .returning();
+      return created;
+    }
+  }
+
+  async deleteCompetitionBook(competitionId: string): Promise<void> {
+    await db.delete(competitionBooks).where(eq(competitionBooks.competitionId, competitionId));
+  }
+
+  // Competition Questions
+  async getCompetitionQuestions(competitionId: string): Promise<CompetitionQuestion[]> {
+    return db.select().from(competitionQuestions).where(eq(competitionQuestions.competitionId, competitionId));
+  }
+
+  async getCompetitionQuestion(id: string): Promise<CompetitionQuestion | undefined> {
+    const [question] = await db.select().from(competitionQuestions).where(eq(competitionQuestions.id, id));
+    return question || undefined;
+  }
+
+  async createCompetitionQuestion(data: InsertCompetitionQuestion): Promise<CompetitionQuestion> {
+    const [question] = await db.insert(competitionQuestions).values(data).returning();
+    return question;
+  }
+
+  async updateCompetitionQuestion(id: string, data: Partial<InsertCompetitionQuestion>): Promise<CompetitionQuestion | undefined> {
+    const [question] = await db.update(competitionQuestions).set(data).where(eq(competitionQuestions.id, id)).returning();
+    return question || undefined;
+  }
+
+  async deleteCompetitionQuestion(id: string): Promise<void> {
+    await db.delete(competitionQuestions).where(eq(competitionQuestions.id, id));
+  }
+
+  // Competition Registrations
+  async getRegistration(competitionId: string, userId: string): Promise<CompetitionRegistration | undefined> {
+    const [registration] = await db.select().from(competitionRegistrations)
+      .where(and(
+        eq(competitionRegistrations.competitionId, competitionId),
+        eq(competitionRegistrations.userId, userId)
+      ));
+    return registration || undefined;
+  }
+
+  async getUserRegistrations(userId: string): Promise<CompetitionRegistration[]> {
+    return db.select().from(competitionRegistrations).where(eq(competitionRegistrations.userId, userId));
+  }
+
+  async getCompetitionRegistrations(competitionId: string): Promise<CompetitionRegistration[]> {
+    return db.select().from(competitionRegistrations).where(eq(competitionRegistrations.competitionId, competitionId));
+  }
+
+  async registerForCompetition(competitionId: string, userId: string): Promise<CompetitionRegistration> {
+    const [registration] = await db.insert(competitionRegistrations)
+      .values({ competitionId, userId })
+      .returning();
+    return registration;
+  }
+
+  // Competition Submissions
+  async getCompetitionSubmission(competitionId: string, userId: string): Promise<Submission | undefined> {
+    const [submission] = await db.select().from(submissions)
+      .where(and(
+        eq(submissions.competitionId, competitionId),
+        eq(submissions.userId, userId)
+      ));
+    return submission || undefined;
+  }
+
+  async getCompetitionSubmissions(competitionId: string): Promise<SubmissionWithUser[]> {
+    const allSubmissions = await db.select().from(submissions)
+      .where(eq(submissions.competitionId, competitionId));
+
+    const result: SubmissionWithUser[] = [];
+    for (const sub of allSubmissions) {
+      const user = await this.getUser(sub.userId);
+      result.push({
+        ...sub,
+        userName: user ? `${user.name} ${user.surname}` : "Unknown",
+        userEmail: user?.email || null,
+        userCity: user?.city || null,
+        userCountry: user?.country || null,
+      });
+    }
+    return result;
+  }
+
+  async getCompetitionLeaderboard(competitionId: string): Promise<LeaderboardEntry[]> {
+    const allSubmissions = await db.select().from(submissions)
+      .where(eq(submissions.competitionId, competitionId))
+      .orderBy(
+        desc(submissions.finalScore),
+        asc(submissions.readingSeconds),
+        asc(submissions.answerSeconds),
+        asc(submissions.createdAt)
+      );
+
+    const entries: LeaderboardEntry[] = [];
+    let rank = 1;
+
+    for (const sub of allSubmissions) {
+      const user = await this.getUser(sub.userId);
+      if (user) {
+        const maskedName = `${user.name} ${user.surname.charAt(0)}.`;
+        entries.push({
+          rank,
+          name: maskedName,
+          city: user.city,
+          country: user.country,
+          finalScore: sub.finalScore || 0,
+          readingSeconds: sub.readingSeconds,
+          answerSeconds: sub.answerSeconds,
+          userId: user.id,
+        });
+        rank++;
+      }
+    }
+
+    return entries;
+  }
+
+  async getAdminCompetitionLeaderboard(competitionId: string): Promise<LeaderboardEntry[]> {
+    const allSubmissions = await db.select().from(submissions)
+      .where(eq(submissions.competitionId, competitionId))
+      .orderBy(
+        desc(submissions.finalScore),
+        asc(submissions.readingSeconds),
+        asc(submissions.answerSeconds),
+        asc(submissions.createdAt)
+      );
+
+    const entries: LeaderboardEntry[] = [];
+    let rank = 1;
+
+    for (const sub of allSubmissions) {
+      const user = await this.getUser(sub.userId);
+      if (user) {
+        const fullName = `${user.name} ${user.surname}`;
+        entries.push({
+          rank,
+          name: fullName,
+          city: user.city,
+          country: user.country,
+          finalScore: sub.finalScore || 0,
+          readingSeconds: sub.readingSeconds,
+          answerSeconds: sub.answerSeconds,
+          userId: user.id,
+        });
+        rank++;
+      }
+    }
+
+    return entries;
   }
 }
 

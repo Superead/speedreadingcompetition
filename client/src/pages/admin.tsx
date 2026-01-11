@@ -36,7 +36,7 @@ import {
   EyeOff,
   RefreshCw,
 } from "lucide-react";
-import type { CompetitionSettings, Book, Question, Prize, User, Submission, Category } from "@shared/schema";
+import type { CompetitionSettings, Book, Question, Prize, User, Submission, Category, Competition, CompetitionBook, CompetitionQuestion } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -1380,6 +1380,377 @@ function SubmissionsTab() {
   );
 }
 
+interface CompetitionWithDetails extends Competition {
+  book?: CompetitionBook;
+  questionCount: number;
+  registrationCount: number;
+}
+
+function CompetitionsTab() {
+  const { toast } = useToast();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingCompetition, setEditingCompetition] = useState<Competition | null>(null);
+  const [selectedCompetitionId, setSelectedCompetitionId] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    title: "",
+    category: "kid" as Category,
+    description: "",
+    registrationStartTime: "",
+    registrationEndTime: "",
+    competitionStartTime: "",
+    competitionEndTime: "",
+    readingDurationMinutes: 30,
+    answeringDurationMinutes: 15,
+  });
+
+  const { data: competitions, isLoading, refetch } = useQuery<CompetitionWithDetails[]>({
+    queryKey: ["/api/admin/competitions"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      const res = await apiRequest("POST", "/api/admin/competitions", {
+        ...data,
+        registrationStartTime: data.registrationStartTime || null,
+        registrationEndTime: data.registrationEndTime || null,
+        competitionStartTime: data.competitionStartTime || null,
+        competitionEndTime: data.competitionEndTime || null,
+      });
+      return res.json();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/competitions"] });
+      setIsDialogOpen(false);
+      resetForm();
+      toast({ title: "Competition created" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: typeof formData & { id: string }) => {
+      const res = await apiRequest("PUT", `/api/admin/competitions/${data.id}`, {
+        ...data,
+        registrationStartTime: data.registrationStartTime || null,
+        registrationEndTime: data.registrationEndTime || null,
+        competitionStartTime: data.competitionStartTime || null,
+        competitionEndTime: data.competitionEndTime || null,
+      });
+      return res.json();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/competitions"] });
+      setIsDialogOpen(false);
+      resetForm();
+      toast({ title: "Competition updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/admin/competitions/${id}`, {});
+      return res.json();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/competitions"] });
+      toast({ title: "Competition deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const publishMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("PUT", `/api/admin/competitions/${id}/publish`, {});
+      return res.json();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/competitions"] });
+      toast({ title: "Competition published" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to publish", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const closeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("PUT", `/api/admin/competitions/${id}/close`, {});
+      return res.json();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/competitions"] });
+      toast({ title: "Competition closed" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to close", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const resetForm = () => {
+    setFormData({
+      title: "",
+      category: "kid",
+      description: "",
+      registrationStartTime: "",
+      registrationEndTime: "",
+      competitionStartTime: "",
+      competitionEndTime: "",
+      readingDurationMinutes: 30,
+      answeringDurationMinutes: 15,
+    });
+    setEditingCompetition(null);
+  };
+
+  const formatDateForInput = (date: Date | string | null | undefined) => {
+    if (!date) return "";
+    const d = new Date(date);
+    return d.toISOString().slice(0, 16);
+  };
+
+  const handleEdit = (competition: Competition) => {
+    setEditingCompetition(competition);
+    setFormData({
+      title: competition.title,
+      category: competition.category,
+      description: competition.description || "",
+      registrationStartTime: formatDateForInput(competition.registrationStartTime),
+      registrationEndTime: formatDateForInput(competition.registrationEndTime),
+      competitionStartTime: formatDateForInput(competition.competitionStartTime),
+      competitionEndTime: formatDateForInput(competition.competitionEndTime),
+      readingDurationMinutes: competition.readingDurationMinutes || 30,
+      answeringDurationMinutes: competition.answeringDurationMinutes || 15,
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleSubmit = () => {
+    if (editingCompetition) {
+      updateMutation.mutate({ ...formData, id: editingCompetition.id });
+    } else {
+      createMutation.mutate(formData);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "DRAFT": return <Badge variant="secondary">Draft</Badge>;
+      case "ACTIVE": return <Badge className="bg-green-600">Active</Badge>;
+      case "CLOSED": return <Badge variant="destructive">Closed</Badge>;
+      default: return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  if (isLoading) {
+    return <Skeleton className="h-96 w-full" />;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <h2 className="text-xl font-semibold">Competition Manager</h2>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
+          <DialogTrigger asChild>
+            <Button className="gap-2" data-testid="button-create-competition">
+              <Plus className="h-4 w-4" />
+              Create Competition
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editingCompetition ? "Edit Competition" : "Create Competition"}</DialogTitle>
+              <DialogDescription>Configure the competition settings</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Title</Label>
+                  <Input
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    placeholder="Competition title"
+                    data-testid="input-competition-title"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v as Category })}>
+                    <SelectTrigger data-testid="select-competition-category">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.map((cat) => (
+                        <SelectItem key={cat} value={cat}>{getCategoryTitle(cat)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Competition description"
+                  data-testid="textarea-competition-description"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Registration Start</Label>
+                  <Input
+                    type="datetime-local"
+                    value={formData.registrationStartTime}
+                    onChange={(e) => setFormData({ ...formData, registrationStartTime: e.target.value })}
+                    data-testid="input-reg-start"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Registration End</Label>
+                  <Input
+                    type="datetime-local"
+                    value={formData.registrationEndTime}
+                    onChange={(e) => setFormData({ ...formData, registrationEndTime: e.target.value })}
+                    data-testid="input-reg-end"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Competition Start</Label>
+                  <Input
+                    type="datetime-local"
+                    value={formData.competitionStartTime}
+                    onChange={(e) => setFormData({ ...formData, competitionStartTime: e.target.value })}
+                    data-testid="input-comp-start"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Competition End</Label>
+                  <Input
+                    type="datetime-local"
+                    value={formData.competitionEndTime}
+                    onChange={(e) => setFormData({ ...formData, competitionEndTime: e.target.value })}
+                    data-testid="input-comp-end"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Reading Duration (minutes)</Label>
+                  <Input
+                    type="number"
+                    value={formData.readingDurationMinutes}
+                    onChange={(e) => setFormData({ ...formData, readingDurationMinutes: parseInt(e.target.value) || 30 })}
+                    min={1}
+                    data-testid="input-reading-duration"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Answering Duration (minutes)</Label>
+                  <Input
+                    type="number"
+                    value={formData.answeringDurationMinutes}
+                    onChange={(e) => setFormData({ ...formData, answeringDurationMinutes: parseInt(e.target.value) || 15 })}
+                    min={1}
+                    data-testid="input-answering-duration"
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={handleSubmit} disabled={createMutation.isPending || updateMutation.isPending || !formData.title} data-testid="button-save-competition">
+                {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                {editingCompetition ? "Update" : "Create"} Competition
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Card>
+        <CardContent className="pt-6">
+          {competitions?.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">No competitions yet. Create your first competition above.</p>
+          ) : (
+            <ScrollArea className="h-[500px]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Questions</TableHead>
+                    <TableHead>Registrations</TableHead>
+                    <TableHead>Competition Period</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {competitions?.map((comp) => (
+                    <TableRow key={comp.id} data-testid={`competition-row-${comp.id}`}>
+                      <TableCell className="font-medium">{comp.title}</TableCell>
+                      <TableCell><Badge variant="outline">{getCategoryTitle(comp.category)}</Badge></TableCell>
+                      <TableCell>{getStatusBadge(comp.status)}</TableCell>
+                      <TableCell>{comp.questionCount || 0}</TableCell>
+                      <TableCell>{comp.registrationCount || 0}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {comp.competitionStartTime && comp.competitionEndTime ? (
+                          <>
+                            {new Date(comp.competitionStartTime).toLocaleDateString()} - {new Date(comp.competitionEndTime).toLocaleDateString()}
+                          </>
+                        ) : (
+                          "Not set"
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right space-x-2">
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(comp)} data-testid={`button-edit-competition-${comp.id}`}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        {comp.status === "DRAFT" && (
+                          <Button variant="ghost" size="icon" onClick={() => publishMutation.mutate(comp.id)} data-testid={`button-publish-competition-${comp.id}`}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {comp.status === "ACTIVE" && (
+                          <Button variant="ghost" size="icon" onClick={() => closeMutation.mutate(comp.id)} data-testid={`button-close-competition-${comp.id}`}>
+                            <EyeOff className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" data-testid={`button-delete-competition-${comp.id}`}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Competition?</AlertDialogTitle>
+                              <AlertDialogDescription>This will permanently delete "{comp.title}" and all associated data.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteMutation.mutate(comp.id)}>Delete</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 interface LeaderboardEntry {
   rank: number;
   userId: string;
@@ -1643,8 +2014,12 @@ export default function AdminDashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="settings" className="space-y-6">
-          <TabsList className="grid grid-cols-4 lg:grid-cols-7 w-full max-w-4xl">
+        <Tabs defaultValue="competitions" className="space-y-6">
+          <TabsList className="grid grid-cols-4 lg:grid-cols-8 w-full max-w-5xl">
+            <TabsTrigger value="competitions" className="gap-2" data-testid="tab-competitions">
+              <Trophy className="h-4 w-4 hidden sm:inline" />
+              Competitions
+            </TabsTrigger>
             <TabsTrigger value="settings" className="gap-2" data-testid="tab-settings">
               <Settings className="h-4 w-4 hidden sm:inline" />
               Settings
@@ -1675,6 +2050,7 @@ export default function AdminDashboard() {
             </TabsTrigger>
           </TabsList>
 
+          <TabsContent value="competitions"><CompetitionsTab /></TabsContent>
           <TabsContent value="settings"><SettingsTab /></TabsContent>
           <TabsContent value="books"><BooksTab /></TabsContent>
           <TabsContent value="questions"><QuestionsTab /></TabsContent>
