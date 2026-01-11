@@ -414,10 +414,10 @@ function QuestionsTab() {
         return res.json();
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/questions"] });
-      setIsDialogOpen(false);
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/questions", selectedCategory] });
       resetForm();
+      setIsDialogOpen(false);
       toast({ title: editingQuestion ? "Question updated" : "Question added" });
     },
     onError: (error: Error) => {
@@ -430,8 +430,8 @@ function QuestionsTab() {
       const res = await apiRequest("DELETE", `/api/admin/questions/${id}`, {});
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/questions"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/questions", selectedCategory] });
       toast({ title: "Question deleted" });
     },
     onError: (error: Error) => {
