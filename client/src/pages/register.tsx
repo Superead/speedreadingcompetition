@@ -6,15 +6,37 @@ import { z } from "zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import type { Category, CompetitionSettings } from "@shared/schema";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import type { Category, Competition } from "@shared/schema";
+
+function getAgeFromBirthdate(birthdate: string): number {
+  const today = new Date();
+  const birth = new Date(birthdate);
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+  return age;
+}
+
+function getAgeRange(category: Category): { min: number; max: number | null; label: string } {
+  switch (category) {
+    case "kid":
+      return { min: 6, max: 12, label: "6-12 years old" };
+    case "teen":
+      return { min: 13, max: 17, label: "13-17 years old" };
+    case "adult":
+      return { min: 18, max: null, label: "18 years or older" };
+  }
+}
 
 const registerFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -22,7 +44,7 @@ const registerFormSchema = z.object({
   email: z.string().email("Valid email is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   gender: z.enum(["male", "female", "other"]).optional(),
-  birthdate: z.string().optional(),
+  birthdate: z.string().min(1, "Date of birth is required"),
   phone: z.string().optional(),
   city: z.string().optional(),
   country: z.string().optional(),
@@ -53,6 +75,14 @@ function getCategoryColor(category: Category) {
   }
 }
 
+function isRegistrationOpenForCompetition(comp: Competition): boolean {
+  if (!comp.registrationStartTime || !comp.registrationEndTime) return false;
+  const now = new Date();
+  const start = new Date(comp.registrationStartTime);
+  const end = new Date(comp.registrationEndTime);
+  return now >= start && now <= end;
+}
+
 export default function RegisterPage() {
   const params = useParams<{ category: string }>();
   const category = params.category as Category;
@@ -60,27 +90,13 @@ export default function RegisterPage() {
   const { toast } = useToast();
   const { login } = useAuth();
 
-  const { data: settings } = useQuery<CompetitionSettings[]>({
-    queryKey: ["/api/settings"],
+  const { data: competitions, isLoading: competitionsLoading } = useQuery<Competition[]>({
+    queryKey: ["/api/competitions/public"],
   });
 
-  const categorySettings = settings?.find((s) => s.category === category);
-
-  const isRegistrationOpen = () => {
-    // If no settings configured, allow registration by default
-    if (!categorySettings) return true;
-    
-    const now = new Date();
-    const start = categorySettings.registrationStartTime ? new Date(categorySettings.registrationStartTime) : null;
-    const end = categorySettings.registrationEndTime ? new Date(categorySettings.registrationEndTime) : null;
-    
-    // If start time is set and we're before it, registration hasn't started
-    if (start && now < start) return false;
-    // If end time is set and we're after it, registration has ended
-    if (end && now > end) return false;
-    
-    return true;
-  };
+  const categoryCompetitions = competitions?.filter(c => c.category === category) || [];
+  const hasRegistrationOpen = categoryCompetitions.some(c => isRegistrationOpenForCompetition(c));
+  const ageRange = getAgeRange(category);
 
   const form = useForm<RegisterFormData>({
     resolver: zodResolver(registerFormSchema),
@@ -97,6 +113,23 @@ export default function RegisterPage() {
       referralCode: "",
     },
   });
+
+  const birthdate = form.watch("birthdate");
+  const ageError = (() => {
+    if (!birthdate) return null;
+    const age = getAgeFromBirthdate(birthdate);
+    if (age < 0) return "Invalid date of birth";
+    if (category === "kid" && (age < ageRange.min || age > ageRange.max!)) {
+      return `Kids category is for ages ${ageRange.label}. You are ${age} years old.`;
+    }
+    if (category === "teen" && (age < ageRange.min || age > ageRange.max!)) {
+      return `Teens category is for ages ${ageRange.label}. You are ${age} years old.`;
+    }
+    if (category === "adult" && age < ageRange.min) {
+      return `Adults category is for ages ${ageRange.label}. You are ${age} years old.`;
+    }
+    return null;
+  })();
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterFormData) => {
@@ -124,6 +157,14 @@ export default function RegisterPage() {
   });
 
   const onSubmit = (data: RegisterFormData) => {
+    if (ageError) {
+      toast({
+        title: "Age mismatch",
+        description: ageError,
+        variant: "destructive",
+      });
+      return;
+    }
     registerMutation.mutate(data);
   };
 
@@ -156,6 +197,7 @@ export default function RegisterPage() {
           <CardHeader className="space-y-4">
             <div className="flex items-center gap-3">
               <Badge className={getCategoryColor(category)}>{getCategoryTitle(category)}</Badge>
+              <span className="text-sm text-muted-foreground">Ages {ageRange.label}</span>
             </div>
             <CardTitle className="text-2xl">Register for Competition</CardTitle>
             <CardDescription>
@@ -163,13 +205,18 @@ export default function RegisterPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {!isRegistrationOpen() ? (
+            {competitionsLoading ? (
+              <div className="text-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+              </div>
+            ) : !hasRegistrationOpen ? (
               <div className="text-center py-6 space-y-4">
+                <AlertTriangle className="h-10 w-10 text-muted-foreground mx-auto" />
                 <p className="text-muted-foreground">
                   Registration is currently closed for this category.
                 </p>
                 <Link href="/">
-                  <Button variant="outline">View all categories</Button>
+                  <Button variant="outline" data-testid="button-view-categories">View all categories</Button>
                 </Link>
               </div>
             ) : (
@@ -260,11 +307,17 @@ export default function RegisterPage() {
                     name="birthdate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Date of Birth</FormLabel>
+                        <FormLabel>Date of Birth *</FormLabel>
                         <FormControl>
                           <Input type="date" {...field} data-testid="input-birthdate" />
                         </FormControl>
                         <FormMessage />
+                        {ageError && (
+                          <Alert variant="destructive" className="mt-2">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertDescription data-testid="text-age-error">{ageError}</AlertDescription>
+                          </Alert>
+                        )}
                       </FormItem>
                     )}
                   />
@@ -332,7 +385,7 @@ export default function RegisterPage() {
                   <Button
                     type="submit"
                     className="w-full"
-                    disabled={registerMutation.isPending}
+                    disabled={registerMutation.isPending || !!ageError}
                     data-testid="button-register-submit"
                   >
                     {registerMutation.isPending ? (

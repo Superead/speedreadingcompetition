@@ -161,17 +161,47 @@ export async function registerRoutes(
     try {
       const data = registerSchema.parse(req.body);
       
-      const settings = await storage.getCompetitionSettings(data.category);
-      if (settings) {
-        const now = new Date();
-        const start = settings.registrationStartTime ? new Date(settings.registrationStartTime) : null;
-        const end = settings.registrationEndTime ? new Date(settings.registrationEndTime) : null;
-        
-        if (start && now < start) {
-          return res.status(400).json({ error: "Registration has not started yet" });
+      const categoryCompetitions = await storage.getActiveCompetitions(data.category);
+      const now = new Date();
+      const hasOpenRegistration = categoryCompetitions.some(c => {
+        if (!c.registrationStartTime && !c.registrationEndTime) return true;
+        if (!c.registrationStartTime || !c.registrationEndTime) return false;
+        const start = new Date(c.registrationStartTime);
+        const end = new Date(c.registrationEndTime);
+        return now >= start && now <= end;
+      });
+
+      if (!hasOpenRegistration) {
+        return res.status(400).json({ error: "Registration is currently closed for this category" });
+      }
+
+      if (!data.birthdate) {
+        return res.status(400).json({ error: "Date of birth is required" });
+      }
+
+      const birth = new Date(data.birthdate);
+      if (isNaN(birth.getTime())) {
+        return res.status(400).json({ error: "Invalid date of birth" });
+      }
+
+      let age = now.getFullYear() - birth.getFullYear();
+      const monthDiff = now.getMonth() - birth.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
+        age--;
+      }
+
+      const ageRanges: Record<string, { min: number; max: number | null }> = {
+        kid: { min: 6, max: 12 },
+        teen: { min: 13, max: 17 },
+        adult: { min: 18, max: null },
+      };
+      const range = ageRanges[data.category];
+      if (range) {
+        if (age < range.min) {
+          return res.status(400).json({ error: `You must be at least ${range.min} years old for the ${data.category} category` });
         }
-        if (end && now > end) {
-          return res.status(400).json({ error: "Registration has ended" });
+        if (range.max && age > range.max) {
+          return res.status(400).json({ error: `You must be ${range.max} years old or younger for the ${data.category} category` });
         }
       }
 

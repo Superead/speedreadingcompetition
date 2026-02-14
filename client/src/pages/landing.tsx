@@ -159,16 +159,25 @@ function CategoryCard({ category, competitions, isLoading }: CategoryCardProps) 
           </div>
         </div>
 
-        <Link href={`/register/${category}`}>
+        {hasRegistrationOpen ? (
+          <Link href={`/register/${category}`}>
+            <Button 
+              className="w-full gap-2" 
+              data-testid={`button-register-${category}`}
+            >
+              Register Now
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
+        ) : (
           <Button 
             className="w-full gap-2" 
-            disabled={!hasRegistrationOpen}
+            disabled
             data-testid={`button-register-${category}`}
           >
-            Register Now
-            <ArrowRight className="h-4 w-4" />
+            Registration Closed
           </Button>
-        </Link>
+        )}
       </CardContent>
     </Card>
   );
