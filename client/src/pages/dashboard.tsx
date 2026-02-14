@@ -382,8 +382,14 @@ export default function DashboardPage() {
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <h3 className="font-semibold text-lg" data-testid="text-book-title">{data.book.title}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Ready for the competition
+                      <p className="text-sm text-muted-foreground" data-testid="text-reading-status">
+                        {!canStartReading() && data?.submission?.readingStartAt
+                          ? "You have already started reading"
+                          : !canStartReading() && data?.settings?.competitionStartTime && new Date() < new Date(data.settings.competitionStartTime)
+                          ? "Competition has not started yet"
+                          : !canStartReading() && isCompetitionEnded()
+                          ? "Competition has ended"
+                          : "Ready for the competition"}
                       </p>
                     </div>
                     <Link href="/competition/read">

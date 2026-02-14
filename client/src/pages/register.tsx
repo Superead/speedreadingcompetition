@@ -134,7 +134,7 @@ export default function RegisterPage() {
           <CardContent className="pt-6 text-center">
             <p className="text-muted-foreground">Invalid category</p>
             <Link href="/">
-              <Button variant="link">Go back home</Button>
+              <Button variant="ghost">Go back home</Button>
             </Link>
           </CardContent>
         </Card>

@@ -140,7 +140,7 @@ export default function LoginPage() {
             <div className="mt-6 text-center text-sm text-muted-foreground">
               Don't have an account?{" "}
               <Link href="/">
-                <Button variant="link" className="p-0 h-auto" data-testid="link-register">
+                <Button variant="ghost" className="p-0 h-auto underline" data-testid="link-register">
                   Register now
                 </Button>
               </Link>

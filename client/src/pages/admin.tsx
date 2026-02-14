@@ -272,12 +272,15 @@ function BooksTab() {
     },
   });
 
-  useState(() => {
+  useEffect(() => {
     if (currentBook) {
       setBookTitle(currentBook.title);
       setBookContent(currentBook.content || "");
+    } else {
+      setBookTitle("");
+      setBookContent("");
     }
-  });
+  }, [currentBook]);
 
   if (isLoading) {
     return <Skeleton className="h-96 w-full" />;
@@ -558,8 +561,21 @@ function QuestionsTab() {
                 </>
               )}
             </div>
+            {!questionForm.prompt && (
+              <p className="text-sm text-destructive" data-testid="text-error-question-prompt">Question text is required</p>
+            )}
+            {questionForm.type === "MCQ" && (!questionForm.optionA || !questionForm.optionB) && questionForm.prompt && (
+              <p className="text-sm text-destructive" data-testid="text-error-question-options">At least options A and B are required for multiple choice</p>
+            )}
+            {questionForm.type === "MCQ" && !questionForm.correctAnswer && questionForm.prompt && (
+              <p className="text-sm text-destructive" data-testid="text-error-question-answer">Please select the correct answer</p>
+            )}
             <DialogFooter>
-              <Button onClick={() => saveMutation.mutate(questionForm)} disabled={saveMutation.isPending || !questionForm.prompt} data-testid="button-save-question">
+              <Button
+                onClick={() => saveMutation.mutate(questionForm)}
+                disabled={saveMutation.isPending || !questionForm.prompt || (questionForm.type === "MCQ" && (!questionForm.optionA || !questionForm.optionB || !questionForm.correctAnswer))}
+                data-testid="button-save-question"
+              >
                 {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 {editingQuestion ? "Update" : "Add"} Question
               </Button>
@@ -654,11 +670,13 @@ function PrizesTab() {
     },
   });
 
-  useState(() => {
+  useEffect(() => {
     if (currentPrize) {
       setContent(currentPrize.content || "");
+    } else {
+      setContent("");
     }
-  });
+  }, [currentPrize]);
 
   if (isLoading) {
     return <Skeleton className="h-96 w-full" />;
@@ -1530,7 +1548,36 @@ function CompetitionsTab() {
     setIsDialogOpen(true);
   };
 
+  const getFormErrors = () => {
+    const errors: string[] = [];
+    if (!formData.title.trim()) errors.push("Title is required");
+    if (formData.registrationStartTime && formData.registrationEndTime) {
+      if (new Date(formData.registrationStartTime) >= new Date(formData.registrationEndTime)) {
+        errors.push("Registration start must be before registration end");
+      }
+    }
+    if (formData.competitionStartTime && formData.competitionEndTime) {
+      if (new Date(formData.competitionStartTime) >= new Date(formData.competitionEndTime)) {
+        errors.push("Competition start must be before competition end");
+      }
+    }
+    if (formData.registrationEndTime && formData.competitionStartTime) {
+      if (new Date(formData.registrationEndTime) > new Date(formData.competitionStartTime)) {
+        errors.push("Registration must end before or when competition starts");
+      }
+    }
+    if (formData.readingDurationMinutes < 1) errors.push("Reading duration must be at least 1 minute");
+    if (formData.answeringDurationMinutes < 1) errors.push("Answering duration must be at least 1 minute");
+    return errors;
+  };
+
+  const formErrors = getFormErrors();
+
   const handleSubmit = () => {
+    if (formErrors.length > 0) {
+      toast({ title: "Please fix the following", description: formErrors.join(". "), variant: "destructive" });
+      return;
+    }
     if (editingCompetition) {
       updateMutation.mutate({ ...formData, id: editingCompetition.id });
     } else {
@@ -1662,8 +1709,15 @@ function CompetitionsTab() {
                 </div>
               </div>
             </div>
+            {formErrors.length > 0 && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-md p-3 space-y-1" data-testid="text-competition-form-errors">
+                {formErrors.map((error, i) => (
+                  <p key={i} className="text-sm text-destructive">{error}</p>
+                ))}
+              </div>
+            )}
             <DialogFooter>
-              <Button onClick={handleSubmit} disabled={createMutation.isPending || updateMutation.isPending || !formData.title} data-testid="button-save-competition">
+              <Button onClick={handleSubmit} disabled={createMutation.isPending || updateMutation.isPending || formErrors.length > 0} data-testid="button-save-competition">
                 {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 {editingCompetition ? "Update" : "Create"} Competition
               </Button>
@@ -1712,14 +1766,46 @@ function CompetitionsTab() {
                           <Edit className="h-4 w-4" />
                         </Button>
                         {comp.status === "DRAFT" && (
-                          <Button variant="ghost" size="icon" onClick={() => publishMutation.mutate(comp.id)} data-testid={`button-publish-competition-${comp.id}`}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              const issues: string[] = [];
+                              if (!comp.competitionStartTime) issues.push("Set a competition start time");
+                              if (!comp.competitionEndTime) issues.push("Set a competition end time");
+                              if ((comp.questionCount || 0) === 0) issues.push("Add at least one question");
+                              if (!comp.book) issues.push("Add a book/reading material");
+                              if (issues.length > 0) {
+                                toast({ title: "Cannot publish yet", description: issues.join(". ") + ".", variant: "destructive" });
+                                return;
+                              }
+                              publishMutation.mutate(comp.id);
+                            }}
+                            data-testid={`button-publish-competition-${comp.id}`}
+                          >
                             <Eye className="h-4 w-4" />
                           </Button>
                         )}
                         {comp.status === "ACTIVE" && (
-                          <Button variant="ghost" size="icon" onClick={() => closeMutation.mutate(comp.id)} data-testid={`button-close-competition-${comp.id}`}>
-                            <EyeOff className="h-4 w-4" />
-                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" data-testid={`button-close-competition-${comp.id}`}>
+                                <EyeOff className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Close Competition?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will close "{comp.title}". Students will no longer be able to register or participate. This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel data-testid="button-cancel-close-competition">Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => closeMutation.mutate(comp.id)} data-testid="button-confirm-close-competition">Close Competition</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         )}
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -1730,7 +1816,9 @@ function CompetitionsTab() {
                           <AlertDialogContent>
                             <AlertDialogHeader>
                               <AlertDialogTitle>Delete Competition?</AlertDialogTitle>
-                              <AlertDialogDescription>This will permanently delete "{comp.title}" and all associated data.</AlertDialogDescription>
+                              <AlertDialogDescription>
+                                This will permanently delete "{comp.title}" and all associated books, questions, registrations, and submissions. This cannot be undone.
+                              </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
