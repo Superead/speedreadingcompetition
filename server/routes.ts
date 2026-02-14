@@ -147,6 +147,16 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/competitions/public", async (req, res) => {
+    try {
+      const allCompetitions = await storage.getAllCompetitions();
+      const activeCompetitions = allCompetitions.filter(c => c.status === "ACTIVE");
+      res.json(activeCompetitions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch competitions" });
+    }
+  });
+
   app.post("/api/auth/register", async (req, res) => {
     try {
       const data = registerSchema.parse(req.body);

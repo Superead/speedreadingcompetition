@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -232,44 +232,33 @@ function SettingsTab() {
 
 function BooksTab() {
   const { toast } = useToast();
-  const [selectedCategory, setSelectedCategory] = useState<Category>("kid");
+  const [selectedCompetitionId, setSelectedCompetitionId] = useState<string>("");
   const [bookTitle, setBookTitle] = useState("");
   const [bookContent, setBookContent] = useState("");
 
-  const { data: books, isLoading } = useQuery<Book[]>({
-    queryKey: ["/api/admin/books"],
+  const { data: competitions, isLoading: competitionsLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/competitions"],
   });
 
-  const currentBook = books?.find((b) => b.category === selectedCategory);
+  useEffect(() => {
+    if (competitions && competitions.length > 0 && !selectedCompetitionId) {
+      setSelectedCompetitionId(competitions[0].id);
+    }
+  }, [competitions, selectedCompetitionId]);
 
-  const saveMutation = useMutation({
-    mutationFn: async (data: { title: string; content: string }) => {
-      const res = await apiRequest("POST", `/api/admin/book/${selectedCategory}`, data);
+  const selectedCompetition = competitions?.find((c) => c.id === selectedCompetitionId);
+
+  const { data: currentBook, isLoading: bookLoading } = useQuery<CompetitionBook | null>({
+    queryKey: ["/api/admin/competitions", selectedCompetitionId, "book"],
+    queryFn: async () => {
+      if (!selectedCompetitionId) return null;
+      const res = await fetch(`/api/admin/competitions/${selectedCompetitionId}/book`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      if (!res.ok) return null;
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/books"] });
-      toast({ title: "Book saved", description: `Book for ${getCategoryTitle(selectedCategory)} updated.` });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to save", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("DELETE", `/api/admin/book/${selectedCategory}`, {});
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/books"] });
-      setBookTitle("");
-      setBookContent("");
-      toast({ title: "Book deleted" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to delete", description: error.message, variant: "destructive" });
-    },
+    enabled: !!selectedCompetitionId,
   });
 
   useEffect(() => {
@@ -282,35 +271,93 @@ function BooksTab() {
     }
   }, [currentBook]);
 
-  if (isLoading) {
+  const saveMutation = useMutation({
+    mutationFn: async (data: { title: string; content: string }) => {
+      const res = await apiRequest("POST", `/api/admin/competitions/${selectedCompetitionId}/book`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/competitions", selectedCompetitionId, "book"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/competitions"] });
+      toast({ title: "Book saved", description: `Book for ${selectedCompetition?.title || "competition"} updated.` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to save", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", `/api/admin/competitions/${selectedCompetitionId}/book`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/competitions", selectedCompetitionId, "book"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/competitions"] });
+      setBookTitle("");
+      setBookContent("");
+      toast({ title: "Book deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete", description: error.message, variant: "destructive" });
+    },
+  });
+
+  if (competitionsLoading) {
     return <Skeleton className="h-96 w-full" />;
   }
 
+  if (!competitions || competitions.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <p className="text-muted-foreground">No competitions found. Create a competition first in the Competitions tab.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const groupedCompetitions = CATEGORIES.reduce((acc, cat) => {
+    acc[cat] = competitions.filter((c) => c.category === cat);
+    return acc;
+  }, {} as Record<string, any[]>);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Label>Category</Label>
-        <Select value={selectedCategory} onValueChange={(v) => {
-          setSelectedCategory(v as Category);
-          const book = books?.find((b) => b.category === v);
-          setBookTitle(book?.title || "");
-          setBookContent(book?.content || "");
-        }}>
-          <SelectTrigger className="w-40" data-testid="select-book-category">
-            <SelectValue />
+      <div className="flex items-center gap-4 flex-wrap">
+        <Label>Competition</Label>
+        <Select value={selectedCompetitionId} onValueChange={setSelectedCompetitionId}>
+          <SelectTrigger className="w-80" data-testid="select-book-competition">
+            <SelectValue placeholder="Select a competition" />
           </SelectTrigger>
           <SelectContent>
-            {CATEGORIES.map((cat) => (
-              <SelectItem key={cat} value={cat}>{getCategoryTitle(cat)}</SelectItem>
-            ))}
+            {CATEGORIES.map((cat) => {
+              const catComps = groupedCompetitions[cat] || [];
+              if (catComps.length === 0) return null;
+              return (
+                <SelectGroup key={cat}>
+                  <SelectLabel>{getCategoryTitle(cat)}</SelectLabel>
+                  {catComps.map((comp: any) => (
+                    <SelectItem key={comp.id} value={comp.id}>
+                      {comp.title} ({comp.status})
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              );
+            })}
           </SelectContent>
         </Select>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>{getCategoryTitle(selectedCategory)} Book</CardTitle>
-          <CardDescription>Manage the reading material for this category</CardDescription>
+          <CardTitle>
+            {currentBook ? currentBook.title : "No Book Added"}
+          </CardTitle>
+          <CardDescription>
+            {selectedCompetition ? `${getCategoryTitle(selectedCompetition.category)} \u00b7 ${selectedCompetition.status}` : "Select a competition"}
+            {" \u2022 "}Manage the reading material for this competition
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -337,7 +384,7 @@ function BooksTab() {
           <div className="flex gap-2">
             <Button 
               onClick={() => saveMutation.mutate({ title: bookTitle, content: bookContent })} 
-              disabled={saveMutation.isPending || !bookTitle}
+              disabled={saveMutation.isPending || !bookTitle || !selectedCompetitionId}
               className="gap-2"
               data-testid="button-save-book"
             >
@@ -355,7 +402,7 @@ function BooksTab() {
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Delete Book?</AlertDialogTitle>
-                    <AlertDialogDescription>This will remove the book for {getCategoryTitle(selectedCategory)}.</AlertDialogDescription>
+                    <AlertDialogDescription>This will remove the book for {selectedCompetition?.title || "this competition"}.</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>

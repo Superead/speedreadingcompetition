@@ -6,11 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CountdownTimer } from "@/components/countdown-timer";
 import { BookOpen, Users, Trophy, Clock, ArrowRight } from "lucide-react";
-import type { CompetitionSettings, Category } from "@shared/schema";
+import type { Competition, Category } from "@shared/schema";
 
 interface CategoryCardProps {
   category: Category;
-  settings?: CompetitionSettings;
+  competitions: Competition[];
   isLoading: boolean;
 }
 
@@ -50,25 +50,35 @@ function getCategoryTitle(category: Category) {
 function getCategoryDescription(category: Category) {
   switch (category) {
     case "kid":
-      return "Ages 6-12 • Fun reading challenges";
+      return "Ages 6-12 \u2022 Fun reading challenges";
     case "teen":
-      return "Ages 13-17 • Intermediate challenges";
+      return "Ages 13-17 \u2022 Intermediate challenges";
     case "adult":
-      return "Ages 18+ • Advanced challenges";
+      return "Ages 18+ \u2022 Advanced challenges";
   }
 }
 
-function isRegistrationOpen(settings?: CompetitionSettings): boolean {
-  if (!settings?.registrationStartTime || !settings?.registrationEndTime) return false;
+function isRegistrationOpen(comp: Competition): boolean {
+  if (!comp.registrationStartTime || !comp.registrationEndTime) return false;
   const now = new Date();
-  const start = new Date(settings.registrationStartTime);
-  const end = new Date(settings.registrationEndTime);
+  const start = new Date(comp.registrationStartTime);
+  const end = new Date(comp.registrationEndTime);
   return now >= start && now <= end;
 }
 
-function CategoryCard({ category, settings, isLoading }: CategoryCardProps) {
-  const registrationOpen = isRegistrationOpen(settings);
+function getNextUpcomingCompetition(competitions: Competition[]): Competition | undefined {
+  const now = new Date();
+  const upcoming = competitions
+    .filter(c => c.registrationStartTime || c.competitionStartTime)
+    .sort((a, b) => {
+      const aTime = a.competitionStartTime ? new Date(a.competitionStartTime).getTime() : Infinity;
+      const bTime = b.competitionStartTime ? new Date(b.competitionStartTime).getTime() : Infinity;
+      return aTime - bTime;
+    });
+  return upcoming[0];
+}
 
+function CategoryCard({ category, competitions, isLoading }: CategoryCardProps) {
   if (isLoading) {
     return (
       <Card className="overflow-visible">
@@ -85,6 +95,9 @@ function CategoryCard({ category, settings, isLoading }: CategoryCardProps) {
     );
   }
 
+  const competition = getNextUpcomingCompetition(competitions);
+  const hasRegistrationOpen = competitions.some(c => isRegistrationOpen(c));
+
   return (
     <Card className="overflow-visible hover-elevate transition-all duration-200">
       <CardHeader className="space-y-4">
@@ -97,20 +110,29 @@ function CategoryCard({ category, settings, isLoading }: CategoryCardProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {competition && (
+          <p className="text-sm text-muted-foreground font-medium" data-testid={`text-competition-title-${category}`}>
+            {competition.title}
+          </p>
+        )}
         <div className="space-y-4">
           <div className="flex items-start gap-3">
             <Clock className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
             <div className="space-y-1">
               <p className="text-sm font-medium">Registration</p>
-              {registrationOpen ? (
-                <Badge variant="default" className="bg-green-600 text-white">Open Now</Badge>
-              ) : settings?.registrationStartTime ? (
-                <div className="space-y-1">
-                  <Badge variant="secondary">Opens in</Badge>
-                  <CountdownTimer targetDate={settings.registrationStartTime} size="sm" showLabels={false} />
-                </div>
+              {hasRegistrationOpen ? (
+                <Badge variant="default" className="bg-green-600 text-white" data-testid={`badge-registration-${category}`}>Open Now</Badge>
+              ) : competition?.registrationStartTime ? (
+                new Date(competition.registrationStartTime) > new Date() ? (
+                  <div className="space-y-1">
+                    <Badge variant="secondary" data-testid={`badge-registration-${category}`}>Opens in</Badge>
+                    <CountdownTimer targetDate={competition.registrationStartTime} size="sm" showLabels={false} />
+                  </div>
+                ) : (
+                  <Badge variant="outline" data-testid={`badge-registration-${category}`}>Closed</Badge>
+                )
               ) : (
-                <Badge variant="outline">Not scheduled</Badge>
+                <Badge variant="outline" data-testid={`badge-registration-${category}`}>Not scheduled</Badge>
               )}
             </div>
           </div>
@@ -119,13 +141,19 @@ function CategoryCard({ category, settings, isLoading }: CategoryCardProps) {
             <Trophy className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
             <div className="space-y-1">
               <p className="text-sm font-medium">Competition</p>
-              {settings?.competitionStartTime ? (
-                <div className="space-y-1">
-                  <Badge variant="secondary">Starts in</Badge>
-                  <CountdownTimer targetDate={settings.competitionStartTime} size="sm" showLabels={false} />
-                </div>
+              {competition?.competitionStartTime ? (
+                new Date(competition.competitionStartTime) > new Date() ? (
+                  <div className="space-y-1">
+                    <Badge variant="secondary" data-testid={`badge-competition-${category}`}>Starts in</Badge>
+                    <CountdownTimer targetDate={competition.competitionStartTime} size="sm" showLabels={false} />
+                  </div>
+                ) : competition?.competitionEndTime && new Date(competition.competitionEndTime) > new Date() ? (
+                  <Badge variant="default" className="bg-green-600 text-white" data-testid={`badge-competition-${category}`}>In Progress</Badge>
+                ) : (
+                  <Badge variant="outline" data-testid={`badge-competition-${category}`}>Ended</Badge>
+                )
               ) : (
-                <Badge variant="outline">Not scheduled</Badge>
+                <Badge variant="outline" data-testid={`badge-competition-${category}`}>Not scheduled</Badge>
               )}
             </div>
           </div>
@@ -134,7 +162,7 @@ function CategoryCard({ category, settings, isLoading }: CategoryCardProps) {
         <Link href={`/register/${category}`}>
           <Button 
             className="w-full gap-2" 
-            disabled={!registrationOpen}
+            disabled={!hasRegistrationOpen}
             data-testid={`button-register-${category}`}
           >
             Register Now
@@ -147,12 +175,12 @@ function CategoryCard({ category, settings, isLoading }: CategoryCardProps) {
 }
 
 export default function LandingPage() {
-  const { data: settings, isLoading } = useQuery<CompetitionSettings[]>({
-    queryKey: ["/api/settings"],
+  const { data: competitions, isLoading } = useQuery<Competition[]>({
+    queryKey: ["/api/competitions/public"],
   });
 
-  const getSettingsForCategory = (category: Category) => {
-    return settings?.find((s) => s.category === category);
+  const getCompetitionsForCategory = (category: Category) => {
+    return competitions?.filter((c) => c.category === category) || [];
   };
 
   return (
@@ -172,7 +200,7 @@ export default function LandingPage() {
             <CategoryCard
               key={category}
               category={category}
-              settings={getSettingsForCategory(category)}
+              competitions={getCompetitionsForCategory(category)}
               isLoading={isLoading}
             />
           ))}
