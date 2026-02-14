@@ -381,6 +381,17 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto px-4 flex items-center justify-between gap-4 h-14">
+          <span className="font-semibold truncate">Speed Reading Competition</span>
+          <Link href="/login">
+            <Button variant="outline" data-testid="button-student-login">
+              Student Login
+            </Button>
+          </Link>
+        </div>
+      </header>
+
       <div className="container mx-auto px-4 py-12 md:py-20">
         <div className="text-center mb-12 md:mb-16 space-y-4">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
@@ -404,20 +415,12 @@ export default function LandingPage() {
 
         <ResultsSection />
 
-        <div className="mt-12 text-center space-y-4">
-          <p className="text-muted-foreground">Already registered?</p>
-          <div className="flex gap-4 justify-center flex-wrap">
-            <Link href="/login">
-              <Button variant="outline" data-testid="button-student-login">
-                Student Login
-              </Button>
-            </Link>
-            <Link href="/admin/login">
-              <Button variant="ghost" data-testid="button-admin-login">
-                Admin Login
-              </Button>
-            </Link>
-          </div>
+        <div className="mt-12 text-center">
+          <Link href="/admin/login">
+            <Button variant="ghost" data-testid="button-admin-login">
+              Admin Login
+            </Button>
+          </Link>
         </div>
       </div>
     </div>
