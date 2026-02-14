@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { ArrowLeft, Loader2, BookOpen } from "lucide-react";
+import { Redirect } from "wouter";
 
 const loginFormSchema = z.object({
   email: z.string().email("Valid email is required"),
@@ -22,7 +23,7 @@ type LoginFormData = z.infer<typeof loginFormSchema>;
 export default function LoginPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { login } = useAuth();
+  const { login, user } = useAuth();
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginFormSchema),
@@ -43,7 +44,6 @@ export default function LoginPage() {
         title: "Welcome back!",
         description: `Logged in as ${data.user.name} ${data.user.surname}`,
       });
-      navigate("/dashboard");
     },
     onError: (error: Error) => {
       toast({
@@ -57,6 +57,10 @@ export default function LoginPage() {
   const onSubmit = (data: LoginFormData) => {
     loginMutation.mutate(data);
   };
+
+  if (user) {
+    return <Redirect to={user.role === "ADMIN" ? "/admin" : "/dashboard"} />;
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center py-8 px-4">

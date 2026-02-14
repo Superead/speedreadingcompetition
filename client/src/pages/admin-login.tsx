@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { ArrowLeft, Loader2, Shield } from "lucide-react";
+import { Redirect } from "wouter";
 
 const adminLoginSchema = z.object({
   email: z.string().email("Valid email required"),
@@ -22,7 +23,7 @@ type AdminLoginData = z.infer<typeof adminLoginSchema>;
 export default function AdminLoginPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { login } = useAuth();
+  const { login, user } = useAuth();
 
   const form = useForm<AdminLoginData>({
     resolver: zodResolver(adminLoginSchema),
@@ -43,7 +44,6 @@ export default function AdminLoginPage() {
         title: "Admin login successful",
         description: "Welcome to the admin dashboard",
       });
-      navigate("/admin");
     },
     onError: (error: Error) => {
       toast({
@@ -57,6 +57,10 @@ export default function AdminLoginPage() {
   const onSubmit = (data: AdminLoginData) => {
     loginMutation.mutate(data);
   };
+
+  if (user) {
+    return <Redirect to={user.role === "ADMIN" ? "/admin" : "/dashboard"} />;
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center py-8 px-4">
