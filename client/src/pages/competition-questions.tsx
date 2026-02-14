@@ -13,7 +13,7 @@ import { DurationTimer } from "@/components/countdown-timer";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Clock, CheckCircle, Loader2, HelpCircle, Send } from "lucide-react";
+import { Clock, CheckCircle, Loader2, HelpCircle } from "lucide-react";
 import type { Question, Submission, CompetitionSettings, Answer } from "@shared/schema";
 import {
   AlertDialog,
@@ -39,10 +39,10 @@ export default function CompetitionQuestionsPage() {
   const { toast } = useToast();
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [showFinishDialog, setShowFinishDialog] = useState(false);
-  const [autoSubmitting, setAutoSubmitting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const finishingRef = useRef(false);
 
-  const { data, isLoading, refetch } = useQuery<QuestionsData>({
+  const { data, isLoading } = useQuery<QuestionsData>({
     queryKey: ["/api/student/questions"],
     enabled: !!token,
   });
@@ -51,78 +51,59 @@ export default function CompetitionQuestionsPage() {
     if (data?.answers) {
       const existingAnswers: Record<string, string> = {};
       data.answers.forEach((answer) => {
-        existingAnswers[answer.questionId] = answer.value || "";
+        const qId = answer.competitionQuestionId || answer.questionId;
+        if (qId) {
+          existingAnswers[qId] = answer.value || "";
+        }
       });
       setAnswers(existingAnswers);
     }
   }, [data?.answers]);
 
-  const submitAnswerMutation = useMutation({
-    mutationFn: async ({ questionId, value }: { questionId: string; value: string }) => {
-      const res = await apiRequest("POST", "/api/student/answers", { questionId, value });
-      return res.json();
-    },
-    onSuccess: () => {
-      refetch();
-      toast({
-        title: "Answer saved",
-        description: "Your answer has been recorded.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to save",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
+  const saveAllAnswersAndFinish = async () => {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
+    setIsSubmitting(true);
 
-  const finishCompetitionMutation = useMutation({
-    mutationFn: async () => {
+    try {
+      const answeredQuestions = Object.entries(answers).filter(([, value]) => value);
+
+      for (const [questionId, value] of answeredQuestions) {
+        await apiRequest("POST", "/api/student/answers", { questionId, value });
+      }
+
       const res = await apiRequest("POST", "/api/student/finish-competition", {});
-      return res.json();
-    },
-    onSuccess: () => {
+      const result = await res.json();
+
       queryClient.invalidateQueries({ queryKey: ["/api/student/dashboard"] });
       toast({
         title: "Submission received!",
         description: "Your answers have been submitted successfully. Results will be available once published.",
       });
       navigate("/dashboard");
-    },
-    onError: (error: Error) => {
+    } catch (error: any) {
       toast({
         title: "Failed to submit",
-        description: error.message,
+        description: error.message || "Something went wrong",
         variant: "destructive",
       });
       finishingRef.current = false;
-      setAutoSubmitting(false);
-    },
-  });
+      setIsSubmitting(false);
+    }
+  };
 
   const handleTimeUp = () => {
     if (finishingRef.current) return;
-    finishingRef.current = true;
-    setAutoSubmitting(true);
     toast({
       title: "Time's up!",
       description: "Auto-submitting your answers.",
       variant: "destructive",
     });
-    finishCompetitionMutation.mutate();
+    saveAllAnswersAndFinish();
   };
 
   const handleAnswerChange = (questionId: string, value: string) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
-  };
-
-  const handleSaveAnswer = (questionId: string) => {
-    const value = answers[questionId];
-    if (value) {
-      submitAnswerMutation.mutate({ questionId, value });
-    }
   };
 
   const hasCompletedCompetition = data?.submission?.answerEndAt != null;
@@ -134,21 +115,19 @@ export default function CompetitionQuestionsPage() {
   }, [hasCompletedCompetition, navigate]);
 
   useEffect(() => {
-    if (!data?.settings?.competitionEndTime || autoSubmitting || hasCompletedCompetition) return;
+    if (!data?.settings?.competitionEndTime || isSubmitting || hasCompletedCompetition) return;
     
     const competitionEnd = new Date(data.settings.competitionEndTime);
     const now = new Date();
     
     const triggerAutoSubmit = () => {
-      if (finishingRef.current || autoSubmitting) return;
-      finishingRef.current = true;
-      setAutoSubmitting(true);
+      if (finishingRef.current || isSubmitting) return;
       toast({
         title: "Competition has ended",
         description: "Your submission has been saved.",
         variant: "destructive",
       });
-      finishCompetitionMutation.mutate();
+      saveAllAnswersAndFinish();
     };
     
     if (now > competitionEnd) {
@@ -161,7 +140,7 @@ export default function CompetitionQuestionsPage() {
       const timeout = setTimeout(triggerAutoSubmit, timeUntilEnd);
       return () => clearTimeout(timeout);
     }
-  }, [data?.settings?.competitionEndTime, autoSubmitting, hasCompletedCompetition]);
+  }, [data?.settings?.competitionEndTime, isSubmitting, hasCompletedCompetition]);
 
   if (isLoading) {
     return (
@@ -187,7 +166,7 @@ export default function CompetitionQuestionsPage() {
             <p className="text-muted-foreground">
               Please complete the reading section first.
             </p>
-            <Button onClick={() => navigate("/competition/read")}>
+            <Button onClick={() => navigate("/competition/read")} data-testid="button-go-reading">
               Go to Reading
             </Button>
           </CardContent>
@@ -236,26 +215,17 @@ export default function CompetitionQuestionsPage() {
           {data.questions?.map((question, index) => {
             const options = question.optionsJson ? JSON.parse(question.optionsJson) : null;
             const currentAnswer = answers[question.id] || "";
-            const isSaved = data.answers?.some((a) => a.questionId === question.id);
 
             return (
               <Card key={question.id} data-testid={`card-question-${index}`}>
                 <CardHeader>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3">
-                      <Badge variant="outline" className="shrink-0">
-                        Q{index + 1}
-                      </Badge>
-                      <CardTitle className="text-lg font-medium leading-relaxed">
-                        {question.prompt}
-                      </CardTitle>
-                    </div>
-                    {isSaved && (
-                      <Badge variant="secondary" className="shrink-0 gap-1">
-                        <CheckCircle className="h-3 w-3" />
-                        Saved
-                      </Badge>
-                    )}
+                  <div className="flex items-start gap-3">
+                    <Badge variant="outline" className="shrink-0">
+                      Q{index + 1}
+                    </Badge>
+                    <CardTitle className="text-lg font-medium leading-relaxed">
+                      {question.prompt}
+                    </CardTitle>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -293,22 +263,6 @@ export default function CompetitionQuestionsPage() {
                       data-testid={`textarea-${question.id}`}
                     />
                   )}
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleSaveAnswer(question.id)}
-                    disabled={!currentAnswer || submitAnswerMutation.isPending}
-                    className="gap-2"
-                    data-testid={`button-save-${question.id}`}
-                  >
-                    {submitAnswerMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                    Save Answer
-                  </Button>
                 </CardContent>
               </Card>
             );
@@ -322,10 +276,20 @@ export default function CompetitionQuestionsPage() {
             size="lg"
             onClick={() => setShowFinishDialog(true)}
             className="gap-2"
+            disabled={isSubmitting}
             data-testid="button-finish-competition"
           >
-            <CheckCircle className="h-5 w-5" />
-            Finish Competition
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              <>
+                <CheckCircle className="h-5 w-5" />
+                Finish Competition
+              </>
+            )}
           </Button>
         </div>
       </footer>
@@ -336,21 +300,18 @@ export default function CompetitionQuestionsPage() {
             <AlertDialogTitle>Finish Competition?</AlertDialogTitle>
             <AlertDialogDescription>
               You have answered {answeredCount} of {totalQuestions} questions.
-              Are you sure you want to submit? This action cannot be undone.
+              Your answers will be saved and submitted automatically.
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Continue Answering</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                if (finishingRef.current) return;
-                finishingRef.current = true;
-                setAutoSubmitting(true);
-                finishCompetitionMutation.mutate();
-              }}
-              disabled={finishCompetitionMutation.isPending}
+              onClick={() => saveAllAnswersAndFinish()}
+              disabled={isSubmitting}
+              data-testid="button-confirm-finish"
             >
-              {finishCompetitionMutation.isPending ? (
+              {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Submitting...
