@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, pgEnum, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, pgEnum, uniqueIndex, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -83,6 +83,7 @@ export const competitionBooks = pgTable("competition_books", {
   title: text("title").notNull(),
   fileUrl: text("file_url"),
   content: text("content"),
+  wordCount: integer("word_count").default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -122,7 +123,9 @@ export const submissions = pgTable("submissions", {
   mcqTotalCount: integer("mcq_total_count").default(0),
   autoScore: integer("auto_score").default(0),
   manualScore: integer("manual_score").default(0),
-  finalScore: integer("final_score").default(0),
+  finalScore: real("final_score").default(0),
+  readingSpeedWPM: real("reading_speed_wpm").default(0),
+  comprehensionScore: real("comprehension_score").default(0),
   status: submissionStatusEnum("status").default("SUBMITTED"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

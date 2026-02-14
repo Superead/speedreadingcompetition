@@ -31,6 +31,8 @@ export interface LeaderboardEntry {
   city: string | null;
   country: string | null;
   finalScore: number;
+  readingSpeedWPM: number | null;
+  comprehensionScore: number | null;
   readingSeconds: number | null;
   answerSeconds: number | null;
   userId: string;
@@ -392,6 +394,8 @@ export class DatabaseStorage implements IStorage {
           city: user.city,
           country: user.country,
           finalScore: sub.finalScore || 0,
+          readingSpeedWPM: sub.readingSpeedWPM,
+          comprehensionScore: sub.comprehensionScore,
           readingSeconds: sub.readingSeconds,
           answerSeconds: sub.answerSeconds,
           userId: user.id,
@@ -426,6 +430,8 @@ export class DatabaseStorage implements IStorage {
           city: user.city,
           country: user.country,
           finalScore: sub.finalScore || 0,
+          readingSpeedWPM: sub.readingSpeedWPM,
+          comprehensionScore: sub.comprehensionScore,
           readingSeconds: sub.readingSeconds,
           answerSeconds: sub.answerSeconds,
           userId: user.id,
@@ -469,14 +475,47 @@ export class DatabaseStorage implements IStorage {
     }
 
     const autoScore = mcqCorrectCount;
-    const finalScore = autoScore + (submission.manualScore || 0);
+
+    let readingSpeedWPM = 0;
+    let comprehensionScore = 0;
+    let calculatedFinalScore = 0;
+
+    let bookWordCount = 0;
+    if (submission.competitionId) {
+      const book = await this.getCompetitionBook(submission.competitionId);
+      bookWordCount = book?.wordCount || 0;
+    }
+
+    if (bookWordCount > 0 && submission.readingSeconds && submission.readingSeconds > 0) {
+      const totalMinutes = Math.floor(submission.readingSeconds / 60);
+      const totalSecondsRemainder = submission.readingSeconds % 60;
+      const timeInMinutes = totalMinutes + (totalSecondsRemainder * 0.01666667);
+
+      if (timeInMinutes > 0) {
+        readingSpeedWPM = bookWordCount / timeInMinutes;
+      }
+    }
+
+    const totalQuestionCount = mcqTotalCount;
+    if (totalQuestionCount > 0) {
+      const ratio = mcqCorrectCount / totalQuestionCount;
+      if (ratio >= 0.4) {
+        comprehensionScore = ratio * 10;
+      } else {
+        comprehensionScore = 0;
+      }
+    }
+
+    calculatedFinalScore = comprehensionScore * readingSpeedWPM;
 
     return this.updateSubmission(submissionId, {
       mcqTotalCount,
       mcqCorrectCount,
       mcqWrongCount,
       autoScore,
-      finalScore,
+      readingSpeedWPM: Math.round(readingSpeedWPM * 100) / 100,
+      comprehensionScore: Math.round(comprehensionScore * 100) / 100,
+      finalScore: Math.round(calculatedFinalScore * 100) / 100,
       updatedAt: new Date(),
     });
   }
@@ -635,6 +674,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertCompetitionBook(competitionId: string, data: Partial<InsertCompetitionBook>): Promise<CompetitionBook> {
+    if (data.content) {
+      data.wordCount = data.content.trim().split(/\s+/).filter(w => w.length > 0).length;
+    }
     const existing = await this.getCompetitionBook(competitionId);
     if (existing) {
       const [updated] = await db.update(competitionBooks)
@@ -754,6 +796,8 @@ export class DatabaseStorage implements IStorage {
           city: user.city,
           country: user.country,
           finalScore: sub.finalScore || 0,
+          readingSpeedWPM: sub.readingSpeedWPM,
+          comprehensionScore: sub.comprehensionScore,
           readingSeconds: sub.readingSeconds,
           answerSeconds: sub.answerSeconds,
           userId: user.id,
@@ -788,6 +832,8 @@ export class DatabaseStorage implements IStorage {
           city: user.city,
           country: user.country,
           finalScore: sub.finalScore || 0,
+          readingSpeedWPM: sub.readingSpeedWPM,
+          comprehensionScore: sub.comprehensionScore,
           readingSeconds: sub.readingSeconds,
           answerSeconds: sub.answerSeconds,
           userId: user.id,

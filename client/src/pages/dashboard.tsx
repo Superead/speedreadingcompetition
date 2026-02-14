@@ -31,6 +31,8 @@ interface LeaderboardEntry {
   city: string | null;
   country: string | null;
   finalScore: number;
+  readingSpeedWPM: number | null;
+  comprehensionScore: number | null;
   readingSeconds: number | null;
   answerSeconds: number | null;
 }
@@ -288,10 +290,21 @@ export default function DashboardPage() {
                           Your answers have been submitted. Results will be available once published by the organizers.
                         </p>
                       )}
-                      {data?.submission?.readingSeconds && (
-                        <p className="text-sm text-muted-foreground mt-2">
-                          Reading time: {Math.floor(data.submission.readingSeconds / 60)}m {data.submission.readingSeconds % 60}s
-                        </p>
+                      {data?.submission && (
+                        <div className="text-sm text-muted-foreground mt-3 space-y-1">
+                          {data.submission.readingSeconds != null && (
+                            <p>Reading time: {Math.floor(data.submission.readingSeconds / 60)}m {data.submission.readingSeconds % 60}s</p>
+                          )}
+                          {data.submission.mcqCorrectCount != null && data.submission.mcqTotalCount != null && (
+                            <p>Correct answers: {data.submission.mcqCorrectCount}/{data.submission.mcqTotalCount}</p>
+                          )}
+                          {data.submission.readingSpeedWPM != null && data.submission.readingSpeedWPM > 0 && (
+                            <p>Reading speed: {Math.round(data.submission.readingSpeedWPM)} WPM</p>
+                          )}
+                          {resultsPublished && data.submission.finalScore != null && (
+                            <p className="font-semibold text-foreground">Score: {Math.round(data.submission.finalScore).toLocaleString()}</p>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -506,12 +519,12 @@ export default function DashboardPage() {
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="font-bold">{entry.finalScore} pts</p>
-                              {entry.readingSeconds && (
-                                <p className="text-xs text-muted-foreground">
-                                  {Math.floor(entry.readingSeconds / 60)}m {entry.readingSeconds % 60}s
-                                </p>
-                              )}
+                              <p className="font-bold" data-testid={`text-score-${entry.rank}`}>{Math.round(entry.finalScore).toLocaleString()}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {entry.readingSpeedWPM ? `${Math.round(entry.readingSpeedWPM)} WPM` : ""}
+                                {entry.readingSpeedWPM && entry.comprehensionScore ? " | " : ""}
+                                {entry.comprehensionScore ? `Comp: ${entry.comprehensionScore.toFixed(1)}` : ""}
+                              </p>
                             </div>
                           </div>
                         ))}
