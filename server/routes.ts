@@ -1198,7 +1198,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/admin/competitions/questions/:questionId", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+  app.put("/api/admin/competitions/:id/questions/:questionId", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
     try {
       const data = questionCreateSchema.parse(req.body);
       const question = await storage.updateCompetitionQuestion(req.params.questionId, {
@@ -1219,7 +1219,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/competitions/questions/:questionId", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+  app.delete("/api/admin/competitions/:id/questions/:questionId", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
     try {
       await storage.deleteCompetitionQuestion(req.params.questionId);
       res.json({ success: true });

@@ -373,9 +373,9 @@ function BooksTab() {
 
 function QuestionsTab() {
   const { toast } = useToast();
-  const [selectedCategory, setSelectedCategory] = useState<Category>("kid");
+  const [selectedCompetitionId, setSelectedCompetitionId] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const [editingQuestion, setEditingQuestion] = useState<CompetitionQuestion | null>(null);
   const [questionForm, setQuestionForm] = useState({
     type: "MCQ" as "MCQ" | "TEXT",
     prompt: "",
@@ -386,11 +386,43 @@ function QuestionsTab() {
     correctAnswer: "",
   });
 
-  const { data: questions, isLoading } = useQuery<Question[]>({
-    queryKey: ["/api/admin/questions", selectedCategory],
+  const { data: competitions, isLoading: competitionsLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/competitions"],
   });
 
-  const categoryQuestions = questions?.filter((q) => q.category === selectedCategory) || [];
+  useEffect(() => {
+    if (competitions && competitions.length > 0 && !selectedCompetitionId) {
+      setSelectedCompetitionId(competitions[0].id);
+    }
+  }, [competitions, selectedCompetitionId]);
+
+  const selectedCompetition = competitions?.find((c) => c.id === selectedCompetitionId);
+
+  const { data: book } = useQuery<CompetitionBook | null>({
+    queryKey: ["/api/admin/competitions", selectedCompetitionId, "book"],
+    queryFn: async () => {
+      if (!selectedCompetitionId) return null;
+      const res = await fetch(`/api/admin/competitions/${selectedCompetitionId}/book`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!selectedCompetitionId,
+  });
+
+  const { data: questions, isLoading: questionsLoading } = useQuery<CompetitionQuestion[]>({
+    queryKey: ["/api/admin/competitions", selectedCompetitionId, "questions"],
+    queryFn: async () => {
+      if (!selectedCompetitionId) return [];
+      const res = await fetch(`/api/admin/competitions/${selectedCompetitionId}/questions`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedCompetitionId,
+  });
 
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -402,7 +434,6 @@ function QuestionsTab() {
       }) : null;
 
       const payload = {
-        category: selectedCategory,
         type: data.type,
         prompt: data.prompt,
         optionsJson: options,
@@ -410,15 +441,16 @@ function QuestionsTab() {
       };
 
       if (editingQuestion) {
-        const res = await apiRequest("PUT", `/api/admin/questions/${editingQuestion.id}`, payload);
+        const res = await apiRequest("PUT", `/api/admin/competitions/${selectedCompetitionId}/questions/${editingQuestion.id}`, payload);
         return res.json();
       } else {
-        const res = await apiRequest("POST", `/api/admin/questions/${selectedCategory}`, payload);
+        const res = await apiRequest("POST", `/api/admin/competitions/${selectedCompetitionId}/questions`, payload);
         return res.json();
       }
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/admin/questions", selectedCategory] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/competitions", selectedCompetitionId, "questions"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/competitions"] });
       resetForm();
       setIsDialogOpen(false);
       toast({ title: editingQuestion ? "Question updated" : "Question added" });
@@ -430,11 +462,12 @@ function QuestionsTab() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await apiRequest("DELETE", `/api/admin/questions/${id}`, {});
+      const res = await apiRequest("DELETE", `/api/admin/competitions/${selectedCompetitionId}/questions/${id}`, {});
       return res.json();
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/admin/questions", selectedCategory] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/competitions", selectedCompetitionId, "questions"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/competitions"] });
       toast({ title: "Question deleted" });
     },
     onError: (error: Error) => {
@@ -455,7 +488,7 @@ function QuestionsTab() {
     setEditingQuestion(null);
   };
 
-  const handleEdit = (question: Question) => {
+  const handleEdit = (question: CompetitionQuestion) => {
     const options = question.optionsJson ? JSON.parse(question.optionsJson) : {};
     setEditingQuestion(question);
     setQuestionForm({
@@ -470,29 +503,49 @@ function QuestionsTab() {
     setIsDialogOpen(true);
   };
 
-  if (isLoading) {
+  if (competitionsLoading) {
     return <Skeleton className="h-96 w-full" />;
+  }
+
+  if (!competitions || competitions.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <HelpCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <p className="text-muted-foreground">No competitions found. Create a competition first in the Competitions tab.</p>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-4">
-          <Label>Category</Label>
-          <Select value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as Category)}>
-            <SelectTrigger className="w-40" data-testid="select-questions-category">
-              <SelectValue />
+          <Label>Competition</Label>
+          <Select value={selectedCompetitionId} onValueChange={setSelectedCompetitionId}>
+            <SelectTrigger className="w-72" data-testid="select-questions-competition">
+              <SelectValue placeholder="Select a competition" />
             </SelectTrigger>
             <SelectContent>
-              {CATEGORIES.map((cat) => (
-                <SelectItem key={cat} value={cat}>{getCategoryTitle(cat)}</SelectItem>
-              ))}
+              {CATEGORIES.map((cat) => {
+                const catCompetitions = competitions.filter((c) => c.category === cat);
+                if (catCompetitions.length === 0) return null;
+                return (
+                  <div key={cat}>
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{getCategoryTitle(cat)}</div>
+                    {catCompetitions.map((comp) => (
+                      <SelectItem key={comp.id} value={comp.id}>
+                        {comp.title}
+                      </SelectItem>
+                    ))}
+                  </div>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
-            <Button className="gap-2" data-testid="button-add-question">
+            <Button className="gap-2" disabled={!selectedCompetitionId} data-testid="button-add-question">
               <Plus className="h-4 w-4" />
               Add Question
             </Button>
@@ -500,7 +553,9 @@ function QuestionsTab() {
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>{editingQuestion ? "Edit Question" : "Add Question"}</DialogTitle>
-              <DialogDescription>Add a question for the {getCategoryTitle(selectedCategory)} category</DialogDescription>
+              <DialogDescription>
+                {selectedCompetition ? `Question for "${selectedCompetition.title}"` : "Select a competition first"}
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
@@ -584,16 +639,53 @@ function QuestionsTab() {
         </Dialog>
       </div>
 
+      {selectedCompetition && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <BookOpen className="h-4 w-4" />
+                Book / Reading Material
+              </CardTitle>
+              <CardDescription>
+                {getCategoryTitle(selectedCompetition.category)} &middot; {selectedCompetition.status}
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {book ? (
+              <div className="space-y-2">
+                <p className="font-medium" data-testid="text-competition-book-title">{book.title}</p>
+                {book.content && (
+                  <ScrollArea className="h-40 border rounded-md p-3">
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap" data-testid="text-competition-book-content">{book.content}</p>
+                  </ScrollArea>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground" data-testid="text-no-book">No book assigned to this competition yet. Add one in the Books tab or Competitions tab.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
-        <CardContent className="pt-6">
-          {categoryQuestions.length === 0 ? (
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">
+            Questions ({questions?.length || 0})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {questionsLoading ? (
+            <Skeleton className="h-40 w-full" />
+          ) : !questions || questions.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">No questions yet. Add your first question above.</p>
           ) : (
             <div className="space-y-4">
-              {categoryQuestions.map((question, index) => {
+              {questions.map((question, index) => {
                 const options = question.optionsJson ? JSON.parse(question.optionsJson) : null;
                 return (
-                  <div key={question.id} className="border rounded-lg p-4 space-y-2" data-testid={`question-item-${index}`}>
+                  <div key={question.id} className="border rounded-md p-4 space-y-2" data-testid={`question-item-${index}`}>
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
@@ -604,7 +696,7 @@ function QuestionsTab() {
                         {options && (
                           <div className="mt-2 grid grid-cols-2 gap-2 text-sm text-muted-foreground">
                             {Object.entries(options).map(([key, value]) => (
-                              <span key={key} className={question.correctAnswer === key ? "text-green-600 font-medium" : ""}>
+                              <span key={key} className={question.correctAnswer === key ? "text-green-600 dark:text-green-400 font-medium" : ""}>
                                 {key}. {value as string}
                               </span>
                             ))}
@@ -628,7 +720,7 @@ function QuestionsTab() {
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => deleteMutation.mutate(question.id)}>Delete</AlertDialogAction>
+                              <AlertDialogAction onClick={() => deleteMutation.mutate(question.id)} data-testid="button-confirm-delete-question">Delete</AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
