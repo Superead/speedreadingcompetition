@@ -157,6 +157,53 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/public/results", async (_req, res) => {
+    try {
+      const allCompetitions = await storage.getAllCompetitions();
+      const results: Record<string, { competition: { id: string; title: string; category: string; resultsPublished: boolean }; leaderboard: any[] }[]> = {
+        kid: [],
+        teen: [],
+        adult: [],
+      };
+
+      for (const comp of allCompetitions) {
+        if (comp.status !== "ACTIVE" && comp.status !== "CLOSED") continue;
+        const published = !!comp.resultsPublishedAt;
+        const entry: any = {
+          competition: {
+            id: comp.id,
+            title: comp.title,
+            category: comp.category,
+            resultsPublished: published,
+          },
+          leaderboard: [],
+        };
+
+        if (published) {
+          const leaderboard = await storage.getAdminCompetitionLeaderboard(comp.id);
+          entry.leaderboard = leaderboard.map((e: any) => ({
+            rank: e.rank,
+            name: e.name,
+            city: e.city,
+            country: e.country,
+            finalScore: e.finalScore,
+            readingSpeedWPM: e.readingSpeedWPM,
+            comprehensionScore: e.comprehensionScore,
+          }));
+        }
+
+        if (comp.category && results[comp.category]) {
+          results[comp.category].push(entry);
+        }
+      }
+
+      res.json(results);
+    } catch (error) {
+      console.error("Public results error:", error);
+      res.status(500).json({ error: "Failed to fetch results" });
+    }
+  });
+
   app.post("/api/auth/register", async (req, res) => {
     try {
       const data = registerSchema.parse(req.body);

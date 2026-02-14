@@ -1,17 +1,45 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CountdownTimer } from "@/components/countdown-timer";
-import { BookOpen, Users, Trophy, Clock, ArrowRight } from "lucide-react";
+import { BookOpen, Users, Trophy, Clock, ArrowRight, Award, Medal } from "lucide-react";
 import type { Competition, Category } from "@shared/schema";
 
 interface CategoryCardProps {
   category: Category;
   competitions: Competition[];
   isLoading: boolean;
+}
+
+interface LeaderboardEntry {
+  rank: number;
+  name: string;
+  city: string;
+  country: string;
+  finalScore: number;
+  readingSpeedWPM: number | null;
+  comprehensionScore: number | null;
+}
+
+interface CompetitionResult {
+  competition: {
+    id: string;
+    title: string;
+    category: string;
+    resultsPublished: boolean;
+  };
+  leaderboard: LeaderboardEntry[];
+}
+
+interface PublicResults {
+  kid: CompetitionResult[];
+  teen: CompetitionResult[];
+  adult: CompetitionResult[];
 }
 
 function getCategoryIcon(category: Category) {
@@ -67,7 +95,6 @@ function isRegistrationOpen(comp: Competition): boolean {
 }
 
 function getNextUpcomingCompetition(competitions: Competition[]): Competition | undefined {
-  const now = new Date();
   const upcoming = competitions
     .filter(c => c.registrationStartTime || c.competitionStartTime)
     .sort((a, b) => {
@@ -76,6 +103,13 @@ function getNextUpcomingCompetition(competitions: Competition[]): Competition | 
       return aTime - bTime;
     });
   return upcoming[0];
+}
+
+function getRankIcon(rank: number) {
+  if (rank === 1) return <Medal className="h-5 w-5 text-yellow-500" />;
+  if (rank === 2) return <Medal className="h-5 w-5 text-gray-400" />;
+  if (rank === 3) return <Medal className="h-5 w-5 text-amber-700 dark:text-amber-500" />;
+  return null;
 }
 
 function CategoryCard({ category, competitions, isLoading }: CategoryCardProps) {
@@ -183,6 +217,159 @@ function CategoryCard({ category, competitions, isLoading }: CategoryCardProps) 
   );
 }
 
+function ResultsLeaderboard({ entries }: { entries: LeaderboardEntry[] }) {
+  if (entries.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground text-center py-4">No participants yet.</p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {entries.map((entry) => (
+        <div
+          key={`${entry.rank}-${entry.name}`}
+          className={`flex items-center gap-3 flex-wrap p-3 rounded-md ${
+            entry.rank <= 3
+              ? "bg-muted/60"
+              : ""
+          }`}
+          data-testid={`result-entry-${entry.rank}`}
+        >
+          <div className="flex items-center justify-center w-8 shrink-0">
+            {getRankIcon(entry.rank) || (
+              <span className="text-sm font-medium text-muted-foreground">{entry.rank}</span>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium truncate" data-testid={`result-name-${entry.rank}`}>
+              {entry.name}
+            </p>
+            {(entry.city || entry.country) && (
+              <p className="text-xs text-muted-foreground truncate">
+                {[entry.city, entry.country].filter(Boolean).join(", ")}
+              </p>
+            )}
+          </div>
+          <div className="text-right shrink-0">
+            <p className="font-semibold tabular-nums" data-testid={`result-score-${entry.rank}`}>
+              {Math.round(entry.finalScore).toLocaleString()}
+            </p>
+            <p className="text-xs text-muted-foreground">points</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CategoryResults({ competitionResults }: { competitionResults: CompetitionResult[] }) {
+  if (competitionResults.length === 0) {
+    return (
+      <div className="text-center py-8 space-y-2">
+        <Clock className="h-8 w-8 text-muted-foreground mx-auto" />
+        <p className="text-muted-foreground">No competitions in this category yet.</p>
+      </div>
+    );
+  }
+
+  const hasPublished = competitionResults.some(cr => cr.competition.resultsPublished);
+
+  if (!hasPublished) {
+    return (
+      <div className="text-center py-8 space-y-2" data-testid="text-results-pending">
+        <Clock className="h-8 w-8 text-muted-foreground mx-auto" />
+        <p className="font-medium">Results will be announced soon</p>
+        <p className="text-sm text-muted-foreground">
+          Competition results are being reviewed. Check back later!
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {competitionResults
+        .filter(cr => cr.competition.resultsPublished)
+        .map((cr) => (
+          <div key={cr.competition.id} className="space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Award className="h-4 w-4 text-muted-foreground shrink-0" />
+              <h4 className="font-medium text-sm" data-testid={`result-competition-title-${cr.competition.id}`}>
+                {cr.competition.title}
+              </h4>
+            </div>
+            <ResultsLeaderboard entries={cr.leaderboard} />
+          </div>
+        ))}
+    </div>
+  );
+}
+
+function ResultsSection() {
+  const { data: results, isLoading } = useQuery<PublicResults>({
+    queryKey: ["/api/public/results"],
+  });
+
+  const [activeTab, setActiveTab] = useState<string>("kid");
+
+  return (
+    <div className="mt-16 max-w-3xl mx-auto" data-testid="section-results">
+      <div className="text-center mb-8 space-y-2">
+        <h2 className="text-3xl font-bold tracking-tight">Competition Results</h2>
+        <p className="text-muted-foreground">
+          See how readers ranked in each category
+        </p>
+      </div>
+
+      <Card className="overflow-visible">
+        <CardContent className="pt-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-3 mb-6" data-testid="results-category-tabs">
+              <TabsTrigger value="kid" data-testid="tab-results-kid">
+                Kids (6-12)
+              </TabsTrigger>
+              <TabsTrigger value="teen" data-testid="tab-results-teen">
+                Teens (13-17)
+              </TabsTrigger>
+              <TabsTrigger value="adult" data-testid="tab-results-adult">
+                Adults (18+)
+              </TabsTrigger>
+            </TabsList>
+
+            {isLoading ? (
+              <div className="space-y-3 py-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-3 p-3">
+                    <Skeleton className="h-8 w-8 rounded-full" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <>
+                <TabsContent value="kid">
+                  <CategoryResults competitionResults={results?.kid || []} />
+                </TabsContent>
+                <TabsContent value="teen">
+                  <CategoryResults competitionResults={results?.teen || []} />
+                </TabsContent>
+                <TabsContent value="adult">
+                  <CategoryResults competitionResults={results?.adult || []} />
+                </TabsContent>
+              </>
+            )}
+          </Tabs>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function LandingPage() {
   const { data: competitions, isLoading } = useQuery<Competition[]>({
     queryKey: ["/api/competitions/public"],
@@ -214,6 +401,8 @@ export default function LandingPage() {
             />
           ))}
         </div>
+
+        <ResultsSection />
 
         <div className="mt-12 text-center space-y-4">
           <p className="text-muted-foreground">Already registered?</p>
