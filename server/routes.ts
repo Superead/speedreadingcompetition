@@ -284,15 +284,35 @@ export async function registerRoutes(
       const user = req.user!;
       const category = user.category as Category;
 
-      const [settings, book, prize, referrals, submission] = await Promise.all([
-        storage.getCompetitionSettings(category),
-        storage.getBook(category),
+      const activeCompetitions = await storage.getActiveCompetitions(category);
+      const competition = activeCompetitions[0] || null;
+
+      let book = null;
+      let submission = null;
+
+      if (competition) {
+        book = await storage.getCompetitionBook(competition.id);
+        submission = await storage.getCompetitionSubmission(competition.id, user.id);
+      }
+
+      const [prize, referrals] = await Promise.all([
         storage.getPrize(category),
         storage.getReferrals(user.id),
-        storage.getSubmission(user.id, category),
       ]);
 
-      res.json({ settings, book, prize, referrals, submission });
+      const settings = competition ? {
+        id: competition.id,
+        category: competition.category,
+        registrationStartTime: competition.registrationStartTime,
+        registrationEndTime: competition.registrationEndTime,
+        competitionStartTime: competition.competitionStartTime,
+        competitionEndTime: competition.competitionEndTime,
+        readingDurationMinutes: competition.readingDurationMinutes,
+        answeringDurationMinutes: competition.answeringDurationMinutes,
+        resultsPublishedAt: competition.resultsPublishedAt,
+      } : null;
+
+      res.json({ settings, book, prize, referrals, submission, competition });
     } catch (error) {
       console.error("Dashboard error:", error);
       res.status(500).json({ error: "Failed to load dashboard" });
@@ -304,13 +324,25 @@ export async function registerRoutes(
       const user = req.user!;
       const category = user.category as Category;
 
-      const [book, submission, settings] = await Promise.all([
-        storage.getBook(category),
-        storage.getSubmission(user.id, category),
-        storage.getCompetitionSettings(category),
-      ]);
+      const activeCompetitions = await storage.getActiveCompetitions(category);
+      const competition = activeCompetitions[0] || null;
 
-      res.json({ book, submission, settings });
+      let book = null;
+      let submission = null;
+
+      if (competition) {
+        book = await storage.getCompetitionBook(competition.id);
+        submission = await storage.getCompetitionSubmission(competition.id, user.id);
+      }
+
+      const settings = competition ? {
+        competitionStartTime: competition.competitionStartTime,
+        competitionEndTime: competition.competitionEndTime,
+        readingDurationMinutes: competition.readingDurationMinutes,
+        answeringDurationMinutes: competition.answeringDurationMinutes,
+      } : null;
+
+      res.json({ book, submission, settings, competition });
     } catch (error) {
       res.status(500).json({ error: "Failed to load reading data" });
     }
@@ -321,24 +353,30 @@ export async function registerRoutes(
       const user = req.user!;
       const category = user.category as Category;
 
-      const settings = await storage.getCompetitionSettings(category);
+      const activeCompetitions = await storage.getActiveCompetitions(category);
+      const competition = activeCompetitions[0];
+      
+      if (!competition) {
+        return res.status(400).json({ error: "No active competition found" });
+      }
+
       const now = new Date();
       
-      if (settings?.competitionStartTime) {
-        const start = new Date(settings.competitionStartTime);
+      if (competition.competitionStartTime) {
+        const start = new Date(competition.competitionStartTime);
         if (now < start) {
           return res.status(400).json({ error: "Competition has not started yet" });
         }
       }
       
-      if (settings?.competitionEndTime) {
-        const end = new Date(settings.competitionEndTime);
+      if (competition.competitionEndTime) {
+        const end = new Date(competition.competitionEndTime);
         if (now > end) {
           return res.status(400).json({ error: "Competition has ended" });
         }
       }
 
-      let submission = await storage.getSubmission(user.id, category);
+      let submission = await storage.getCompetitionSubmission(competition.id, user.id);
       
       if (submission?.readingStartAt) {
         return res.status(400).json({ error: "Reading already started" });
@@ -351,6 +389,7 @@ export async function registerRoutes(
       } else {
         submission = await storage.createSubmission({
           userId: user.id,
+          competitionId: competition.id,
           category,
           readingStartAt,
         });
@@ -368,7 +407,13 @@ export async function registerRoutes(
       const user = req.user!;
       const category = user.category as Category;
 
-      const submission = await storage.getSubmission(user.id, category);
+      const activeCompetitions = await storage.getActiveCompetitions(category);
+      const competition = activeCompetitions[0];
+      if (!competition) {
+        return res.status(400).json({ error: "No active competition found" });
+      }
+
+      const submission = await storage.getCompetitionSubmission(competition.id, user.id);
       if (!submission?.readingStartAt) {
         return res.status(400).json({ error: "Reading not started" });
       }
@@ -381,6 +426,7 @@ export async function registerRoutes(
 
       const updated = await storage.updateSubmission(submission.id, {
         readingEndAt,
+        answerStartAt: readingEndAt,
         readingSeconds,
       });
 
@@ -396,10 +442,15 @@ export async function registerRoutes(
       const user = req.user!;
       const category = user.category as Category;
 
-      const [questions, submission, settings] = await Promise.all([
-        storage.getQuestions(category),
-        storage.getSubmission(user.id, category),
-        storage.getCompetitionSettings(category),
+      const activeCompetitions = await storage.getActiveCompetitions(category);
+      const competition = activeCompetitions[0];
+      if (!competition) {
+        return res.status(400).json({ error: "No active competition found" });
+      }
+
+      const [questions, submission] = await Promise.all([
+        storage.getCompetitionQuestions(competition.id),
+        storage.getCompetitionSubmission(competition.id, user.id),
       ]);
 
       let userAnswers: any[] = [];
@@ -407,7 +458,14 @@ export async function registerRoutes(
         userAnswers = await storage.getAnswers(submission.id);
       }
 
-      res.json({ questions, submission, settings, answers: userAnswers });
+      const settings = {
+        competitionStartTime: competition.competitionStartTime,
+        competitionEndTime: competition.competitionEndTime,
+        readingDurationMinutes: competition.readingDurationMinutes,
+        answeringDurationMinutes: competition.answeringDurationMinutes,
+      };
+
+      res.json({ questions, submission, settings, answers: userAnswers, competition });
     } catch (error) {
       res.status(500).json({ error: "Failed to load questions" });
     }
@@ -423,10 +481,15 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Question ID is required" });
       }
 
-      const settings = await storage.getCompetitionSettings(category);
-      if (settings?.competitionEndTime) {
+      const activeCompetitions = await storage.getActiveCompetitions(category);
+      const competition = activeCompetitions[0];
+      if (!competition) {
+        return res.status(400).json({ error: "No active competition found" });
+      }
+
+      if (competition.competitionEndTime) {
         const now = new Date();
-        const end = new Date(settings.competitionEndTime);
+        const end = new Date(competition.competitionEndTime);
         if (now > end) {
           return res.status(400).json({ error: "Competition has ended. Cannot submit new answers." });
         }
@@ -434,7 +497,7 @@ export async function registerRoutes(
 
       const answerValue = value !== undefined ? String(value) : "";
 
-      const submission = await storage.getSubmission(user.id, category);
+      const submission = await storage.getCompetitionSubmission(competition.id, user.id);
       if (!submission?.readingEndAt) {
         return res.status(400).json({ error: "Reading not completed" });
       }
@@ -442,7 +505,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Competition already finished" });
       }
 
-      const question = await storage.getQuestion(questionId);
+      const question = await storage.getCompetitionQuestion(questionId);
       if (!question) {
         return res.status(404).json({ error: "Question not found" });
       }
@@ -461,7 +524,13 @@ export async function registerRoutes(
       const user = req.user!;
       const category = user.category as Category;
 
-      const submission = await storage.getSubmission(user.id, category);
+      const activeCompetitions = await storage.getActiveCompetitions(category);
+      const competition = activeCompetitions[0];
+      if (!competition) {
+        return res.status(400).json({ error: "No active competition found" });
+      }
+
+      const submission = await storage.getCompetitionSubmission(competition.id, user.id);
       if (!submission?.readingEndAt) {
         return res.status(400).json({ error: "Reading not completed" });
       }

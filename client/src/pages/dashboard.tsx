@@ -23,7 +23,7 @@ import {
   Award,
   Medal
 } from "lucide-react";
-import type { CompetitionSettings, Book, Prize, User, Submission } from "@shared/schema";
+import type { Competition, CompetitionBook, Prize, User, Submission } from "@shared/schema";
 
 interface LeaderboardEntry {
   rank: number;
@@ -35,12 +35,25 @@ interface LeaderboardEntry {
   answerSeconds: number | null;
 }
 
+interface CompetitionSettings {
+  id: string;
+  category: string;
+  registrationStartTime: Date | string | null;
+  registrationEndTime: Date | string | null;
+  competitionStartTime: Date | string | null;
+  competitionEndTime: Date | string | null;
+  readingDurationMinutes: number | null;
+  answeringDurationMinutes: number | null;
+  resultsPublishedAt: Date | string | null;
+}
+
 interface DashboardData {
   settings: CompetitionSettings | null;
-  book: Book | null;
+  book: CompetitionBook | null;
   prize: Prize | null;
   referrals: User[];
   submission: Submission | null;
+  competition: Competition | null;
 }
 
 function getCategoryColor(category: string) {
@@ -250,6 +263,11 @@ export default function DashboardPage() {
                   <Clock className="h-5 w-5" />
                   Competition Status
                 </CardTitle>
+                {data?.competition && (
+                  <CardDescription data-testid="text-competition-name">
+                    {data.competition.title}
+                  </CardDescription>
+                )}
               </CardHeader>
               <CardContent className="space-y-6">
                 {isLoading ? (
