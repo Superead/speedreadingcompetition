@@ -91,12 +91,21 @@ export default function CompetitionReadPage() {
 
   const isReadingActive = data?.submission?.readingStartAt && !data?.submission?.readingEndAt;
   const hasFinishedReading = data?.submission?.readingEndAt != null;
+  const hasCompletedCompetition = data?.submission?.answerEndAt != null;
 
   useEffect(() => {
+    if (hasCompletedCompetition) {
+      toast({
+        title: "Competition already completed",
+        description: "You have already finished this competition. Results will be announced soon.",
+      });
+      navigate("/dashboard");
+      return;
+    }
     if (hasFinishedReading) {
       navigate("/competition/questions");
     }
-  }, [hasFinishedReading, navigate]);
+  }, [hasFinishedReading, hasCompletedCompetition, navigate]);
 
   useEffect(() => {
     if (!isReadingActive || !data?.settings?.competitionEndTime || autoFinishing || hasFinishedReading) return;

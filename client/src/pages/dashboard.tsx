@@ -401,7 +401,9 @@ export default function DashboardPage() {
                     <div>
                       <h3 className="font-semibold text-lg" data-testid="text-book-title">{data.book.title}</h3>
                       <p className="text-sm text-muted-foreground" data-testid="text-reading-status">
-                        {!canStartReading() && data?.submission?.readingStartAt
+                        {data?.submission?.answerEndAt
+                          ? "Competition completed"
+                          : !canStartReading() && data?.submission?.readingStartAt
                           ? "You have already started reading"
                           : !canStartReading() && data?.settings?.competitionStartTime && new Date() < new Date(data.settings.competitionStartTime)
                           ? "Competition has not started yet"
@@ -410,14 +412,19 @@ export default function DashboardPage() {
                           : "Ready for the competition"}
                       </p>
                     </div>
-                    <Link href="/competition/read">
-                      <Button 
-                        disabled={!canStartReading()}
-                        data-testid="button-start-reading"
-                      >
+                    {data?.submission?.answerEndAt ? (
+                      <Badge variant="secondary" className="shrink-0">Completed</Badge>
+                    ) : canStartReading() ? (
+                      <Link href="/competition/read">
+                        <Button data-testid="button-start-reading">
+                          Start Reading
+                        </Button>
+                      </Link>
+                    ) : (
+                      <Button disabled data-testid="button-start-reading">
                         Start Reading
                       </Button>
-                    </Link>
+                    )}
                   </div>
                 ) : (
                   <p className="text-center text-muted-foreground py-4">
