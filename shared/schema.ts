@@ -131,7 +131,7 @@ export const submissions = pgTable("submissions", {
 export const answers = pgTable("answers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   submissionId: varchar("submission_id").notNull().references(() => submissions.id),
-  questionId: varchar("question_id").notNull().references(() => questions.id),
+  questionId: varchar("question_id").references(() => questions.id),
   competitionQuestionId: varchar("competition_question_id").references(() => competitionQuestions.id),
   type: questionTypeEnum("type").notNull(),
   value: text("value"),

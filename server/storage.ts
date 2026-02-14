@@ -347,10 +347,15 @@ export class DatabaseStorage implements IStorage {
     }
 
     const submissionAnswers = await this.getAnswers(id);
-    const answersWithQuestions: (Answer & { question: Question })[] = [];
+    const answersWithQuestions: (Answer & { question: Question | CompetitionQuestion })[] = [];
     
     for (const ans of submissionAnswers) {
-      const question = await this.getQuestion(ans.questionId);
+      let question: Question | CompetitionQuestion | undefined;
+      if (ans.competitionQuestionId) {
+        question = await this.getCompetitionQuestion(ans.competitionQuestionId);
+      } else if (ans.questionId) {
+        question = await this.getQuestion(ans.questionId);
+      }
       if (question) {
         answersWithQuestions.push({ ...ans, question });
       }
@@ -437,16 +442,22 @@ export class DatabaseStorage implements IStorage {
     if (!submission) return undefined;
 
     const submissionAnswers = await this.getAnswers(submissionId);
-    const categoryQuestions = await this.getQuestions(submission.category);
     
-    const mcqQuestions = categoryQuestions.filter(q => q.type === "MCQ");
+    let allQuestions: any[] = [];
+    if (submission.competitionId) {
+      allQuestions = await this.getCompetitionQuestions(submission.competitionId);
+    } else {
+      allQuestions = await this.getQuestions(submission.category);
+    }
+    
+    const mcqQuestions = allQuestions.filter(q => q.type === "MCQ");
     const mcqTotalCount = mcqQuestions.length;
     let mcqCorrectCount = 0;
     let mcqWrongCount = 0;
 
     for (const ans of submissionAnswers) {
       if (ans.type === "MCQ") {
-        const question = mcqQuestions.find(q => q.id === ans.questionId);
+        const question = mcqQuestions.find(q => q.id === ans.competitionQuestionId || q.id === ans.questionId);
         if (question && ans.value === question.correctAnswer) {
           mcqCorrectCount++;
           await db.update(answers).set({ isCorrect: true }).where(eq(answers.id, ans.id));
@@ -476,7 +487,7 @@ export class DatabaseStorage implements IStorage {
 
   async upsertAnswer(submissionId: string, questionId: string, type: "MCQ" | "TEXT", value: string): Promise<Answer> {
     const [existing] = await db.select().from(answers)
-      .where(and(eq(answers.submissionId, submissionId), eq(answers.questionId, questionId)));
+      .where(and(eq(answers.submissionId, submissionId), eq(answers.competitionQuestionId, questionId)));
     
     if (existing) {
       const [updated] = await db.update(answers)
@@ -486,7 +497,7 @@ export class DatabaseStorage implements IStorage {
       return updated;
     } else {
       const [created] = await db.insert(answers)
-        .values({ submissionId, questionId, type, value })
+        .values({ submissionId, competitionQuestionId: questionId, type, value })
         .returning();
       return created;
     }
