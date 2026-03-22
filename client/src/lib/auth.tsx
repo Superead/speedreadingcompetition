@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import type { User } from "@shared/schema";
+import { queryClient } from "@/lib/queryClient";
+import { changeLanguage } from "@/lib/i18n";
 
 interface AuthContextType {
   user: User | null;
@@ -23,17 +25,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedUser = localStorage.getItem("user");
     
     if (storedToken && storedUser) {
+      const parsed = JSON.parse(storedUser);
       setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+      setUser(parsed);
+      // UI language is managed by i18n.ts init (reads from localStorage "i18n_lang")
+      // No need to override it here — the globe dropdown controls UI language
     }
     setIsLoading(false);
   }, []);
 
   const login = (newToken: string, newUser: User) => {
+    // Clear all cached data from any previous user session
+    queryClient.clear();
     setToken(newToken);
     setUser(newUser);
     localStorage.setItem("token", newToken);
     localStorage.setItem("user", JSON.stringify(newUser));
+    // Only set UI language on first login (when no explicit UI language choice exists yet)
+    if (!localStorage.getItem("i18n_lang") && (newUser as any).preferredLanguage) {
+      changeLanguage((newUser as any).preferredLanguage);
+    }
   };
 
   const logout = () => {
@@ -41,6 +52,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    localStorage.removeItem("i18n_lang");
+    // Clear all cached queries so next user doesn't see stale data
+    queryClient.clear();
+    // Reset UI language to Turkish (default)
+    changeLanguage("tr");
   };
 
   const isAdmin = user?.role === "ADMIN";

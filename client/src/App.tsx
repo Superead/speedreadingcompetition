@@ -1,4 +1,4 @@
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -12,10 +12,27 @@ import AdminLoginPage from "@/pages/admin-login";
 import DashboardPage from "@/pages/dashboard";
 import CompetitionReadPage from "@/pages/competition-read";
 import CompetitionQuestionsPage from "@/pages/competition-questions";
+import CompetitionResultsPage from "@/pages/competition-results";
 import AdminDashboard from "@/pages/admin";
+import ForgotPasswordPage from "@/pages/forgot-password";
+import ResetPasswordPage from "@/pages/reset-password";
+import { useEffect } from "react";
+import "@/lib/i18n";
 
 function ProtectedRoute({ component: Component, adminOnly = false }: { component: React.ComponentType; adminOnly?: boolean }) {
   const { user, isLoading, isAdmin, isStudent } = useAuth();
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!user) {
+      navigate(adminOnly ? "/admin-login" : "/login", { replace: true });
+    } else if (adminOnly && !isAdmin) {
+      navigate("/admin-login", { replace: true });
+    } else if (!adminOnly && !isStudent) {
+      navigate("/admin", { replace: true });
+    }
+  }, [user, isLoading, isAdmin, isStudent, adminOnly, navigate]);
 
   if (isLoading) {
     return (
@@ -25,16 +42,8 @@ function ProtectedRoute({ component: Component, adminOnly = false }: { component
     );
   }
 
-  if (!user) {
-    return <Redirect to={adminOnly ? "/admin/login" : "/login"} />;
-  }
-
-  if (adminOnly && !isAdmin) {
-    return <Redirect to="/admin/login" />;
-  }
-
-  if (!adminOnly && !isStudent) {
-    return <Redirect to="/admin" />;
+  if (!user || (adminOnly && !isAdmin) || (!adminOnly && !isStudent)) {
+    return null;
   }
 
   return <Component />;
@@ -45,9 +54,11 @@ function Router() {
     <Switch>
       <Route path="/" component={LandingPage} />
       <Route path="/register/:category" component={RegisterPage} />
+      <Route path="/register" component={RegisterPage} />
       <Route path="/login" component={LoginPage} />
-      <Route path="/admin/login" component={AdminLoginPage} />
-      <Route path="/admin-login">{() => <Redirect to="/admin/login" />}</Route>
+      <Route path="/admin-login" component={AdminLoginPage} />
+      <Route path="/forgot-password" component={ForgotPasswordPage} />
+      <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/dashboard">
         {() => <ProtectedRoute component={DashboardPage} />}
       </Route>
@@ -56,6 +67,9 @@ function Router() {
       </Route>
       <Route path="/competition/questions">
         {() => <ProtectedRoute component={CompetitionQuestionsPage} />}
+      </Route>
+      <Route path="/competition/results">
+        {() => <ProtectedRoute component={CompetitionResultsPage} />}
       </Route>
       <Route path="/admin">
         {() => <ProtectedRoute component={AdminDashboard} adminOnly />}

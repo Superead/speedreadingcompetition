@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Clock, BookOpen, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
 import type { Book, Submission, CompetitionSettings } from "@shared/schema";
+import { useTranslation } from "react-i18next";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +34,7 @@ export default function CompetitionReadPage() {
   const { token } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [showFinishDialog, setShowFinishDialog] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [autoFinishing, setAutoFinishing] = useState(false);
@@ -52,8 +54,8 @@ export default function CompetitionReadPage() {
       setHasStarted(true);
       refetch();
       toast({
-        title: "Reading started!",
-        description: "Your timer has begun. Good luck!",
+        title: t('reading.started'),
+        description: t('reading.timerBegun'),
       });
     },
     onError: (error: Error) => {
@@ -73,8 +75,8 @@ export default function CompetitionReadPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/student/dashboard"] });
       toast({
-        title: "Reading completed!",
-        description: "Now answer the questions.",
+        title: t('reading.completed'),
+        description: t('reading.nowAnswer'),
       });
       navigate("/competition/questions");
     },
@@ -93,6 +95,21 @@ export default function CompetitionReadPage() {
   const hasFinishedReading = data?.submission?.readingEndAt != null;
   const hasCompletedCompetition = data?.submission?.answerEndAt != null;
 
+  // Block copy shortcuts (Ctrl+C, Ctrl+A, Ctrl+U) on reading page
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && ["c", "a", "u", "s"].includes(e.key.toLowerCase())) {
+        e.preventDefault();
+      }
+      // Block PrintScreen
+      if (e.key === "PrintScreen") {
+        e.preventDefault();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   useEffect(() => {
     if (hasCompletedCompetition) {
       toast({
@@ -107,12 +124,19 @@ export default function CompetitionReadPage() {
     }
   }, [hasFinishedReading, hasCompletedCompetition, navigate]);
 
+  // Auto-finish reading ONLY if reading was actively started before competition ended
   useEffect(() => {
     if (!isReadingActive || !data?.settings?.competitionEndTime || autoFinishing || hasFinishedReading) return;
-    
+    // Only auto-finish if reading was started BEFORE the competition ended
+    if (!data?.submission?.readingStartAt) return;
+
     const competitionEnd = new Date(data.settings.competitionEndTime);
+    const readingStarted = new Date(data.submission.readingStartAt);
     const now = new Date();
-    
+
+    // If reading was started after competition ended (shouldn't happen but safety check), don't auto-finish
+    if (readingStarted > competitionEnd) return;
+
     const triggerAutoFinish = () => {
       if (finishingRef.current || autoFinishing) return;
       finishingRef.current = true;
@@ -124,12 +148,12 @@ export default function CompetitionReadPage() {
       });
       finishReadingMutation.mutate();
     };
-    
+
     if (now > competitionEnd) {
       triggerAutoFinish();
       return;
     }
-    
+
     const timeUntilEnd = competitionEnd.getTime() - now.getTime();
     if (timeUntilEnd > 0) {
       const timeout = setTimeout(triggerAutoFinish, timeUntilEnd);
@@ -169,12 +193,12 @@ export default function CompetitionReadPage() {
         <Card className="max-w-md w-full">
           <CardContent className="pt-6 text-center space-y-4">
             <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto" />
-            <h2 className="text-xl font-semibold">No Book Available</h2>
+            <h2 className="text-xl font-semibold">{t('reading.noBook')}</h2>
             <p className="text-muted-foreground">
-              The book for this competition has not been uploaded yet.
+              {t('reading.noBookDesc')}
             </p>
             <Button onClick={() => navigate("/dashboard")}>
-              Back to Dashboard
+              {t('common.backToDashboard')}
             </Button>
           </CardContent>
         </Card>
@@ -193,20 +217,20 @@ export default function CompetitionReadPage() {
               </div>
               <h2 className="text-2xl font-bold">{data.book.title}</h2>
               <p className="text-muted-foreground">
-                You have <span className="font-semibold text-foreground">{data.settings?.readingDurationMinutes || 30} minutes</span> to read.
+                {t('reading.youHaveMinutes', { minutes: data.settings?.readingDurationMinutes || 30 })}
               </p>
             </div>
 
             <div className="bg-muted/50 rounded-lg p-4 space-y-2">
               <h3 className="font-semibold flex items-center gap-2">
                 <Clock className="h-4 w-4" />
-                Instructions
+                {t('reading.instructions')}
               </h3>
               <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Your timer starts when you click "Start Reading"</li>
-                <li>• Read carefully as you'll answer questions afterwards</li>
-                <li>• Click "Finish Reading" when done</li>
-                <li>• Timer auto-submits when time runs out</li>
+                <li>• {t('reading.instruction1')}</li>
+                <li>• {t('reading.instruction2')}</li>
+                <li>• {t('reading.instruction3')}</li>
+                <li>• {t('reading.instruction4')}</li>
               </ul>
             </div>
 
@@ -220,10 +244,10 @@ export default function CompetitionReadPage() {
               {startReadingMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Starting...
+                  {t('reading.starting')}
                 </>
               ) : (
-                "Start Reading"
+                t('reading.startReading')
               )}
             </Button>
           </CardContent>
@@ -241,15 +265,15 @@ export default function CompetitionReadPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-50 border-b bg-card">
         <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <BookOpen className="h-5 w-5 text-primary" />
-              <span className="font-semibold hidden sm:inline">{data.book.title}</span>
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <BookOpen className="h-5 w-5 text-primary shrink-0" />
+              <span className="font-semibold hidden sm:inline truncate">{data.book.title}</span>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 text-sm">
                 <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Time remaining:</span>
+                <span className="text-muted-foreground hidden sm:inline">{t('reading.timeRemaining')}:</span>
                 <DurationTimer
                   startTime={readingStart}
                   durationMinutes={durationMinutes}
@@ -263,11 +287,19 @@ export default function CompetitionReadPage() {
         </div>
       </header>
 
-      <main className="flex-1 container mx-auto px-4 py-8">
+      <main className="flex-1 container mx-auto px-3 sm:px-4 py-4 sm:py-8">
         <Card className="max-w-4xl mx-auto">
-          <CardContent className="p-8">
-            <ScrollArea className="h-[60vh]">
-              <div className="prose prose-lg dark:prose-invert max-w-none" data-testid="book-content">
+          <CardContent className="p-4 sm:p-6 md:p-8">
+            <ScrollArea className="h-[calc(100vh-220px)] sm:h-[60vh]">
+              <div
+                className="prose prose-lg dark:prose-invert max-w-none select-none"
+                data-testid="book-content"
+                style={{ WebkitUserSelect: "none", userSelect: "none" }}
+                onCopy={(e) => e.preventDefault()}
+                onCut={(e) => e.preventDefault()}
+                onContextMenu={(e) => e.preventDefault()}
+                onDragStart={(e) => e.preventDefault()}
+              >
                 {data.book.content ? (
                   <div dangerouslySetInnerHTML={{ __html: data.book.content.replace(/\n/g, '<br><br>') }} />
                 ) : data.book.fileUrl ? (
@@ -302,7 +334,7 @@ export default function CompetitionReadPage() {
             data-testid="button-finish-reading"
           >
             <CheckCircle className="h-5 w-5" />
-            Finish Reading
+            {t('reading.finishReading')}
           </Button>
         </div>
       </footer>
@@ -310,13 +342,13 @@ export default function CompetitionReadPage() {
       <AlertDialog open={showFinishDialog} onOpenChange={setShowFinishDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Finish Reading?</AlertDialogTitle>
+            <AlertDialogTitle>{t('reading.finishReadingTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to finish reading? You won't be able to come back to the book. You will proceed to the questions section.
+              {t('reading.finishReadingDesc')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep Reading</AlertDialogCancel>
+            <AlertDialogCancel>{t('reading.keepReading')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (finishingRef.current) return;
@@ -329,10 +361,10 @@ export default function CompetitionReadPage() {
               {finishReadingMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Finishing...
+                  {t('reading.finishing')}
                 </>
               ) : (
-                "Yes, Finish"
+                t('reading.yesFinish')
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

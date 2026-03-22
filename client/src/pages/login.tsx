@@ -12,6 +12,8 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { ArrowLeft, Loader2, BookOpen } from "lucide-react";
 import { Redirect } from "wouter";
+import { useTranslation } from "react-i18next";
+import { changeLanguage } from "@/lib/i18n";
 
 const loginFormSchema = z.object({
   email: z.string().email("Valid email is required"),
@@ -24,6 +26,7 @@ export default function LoginPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { login, user } = useAuth();
+  const { t } = useTranslation();
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginFormSchema),
@@ -40,6 +43,10 @@ export default function LoginPage() {
     },
     onSuccess: (data) => {
       login(data.token, data.user);
+      // Sync i18n language with user's preferred language
+      if (data.user.preferredLanguage) {
+        changeLanguage(data.user.preferredLanguage);
+      }
       toast({
         title: "Welcome back!",
         description: `Logged in as ${data.user.name} ${data.user.surname}`,
@@ -68,7 +75,7 @@ export default function LoginPage() {
         <Link href="/">
           <Button variant="ghost" size="sm" className="gap-2" data-testid="button-back-home">
             <ArrowLeft className="h-4 w-4" />
-            Back to home
+            {t('register.backToHome')}
           </Button>
         </Link>
 
@@ -77,9 +84,9 @@ export default function LoginPage() {
             <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
               <BookOpen className="h-6 w-6 text-primary" />
             </div>
-            <CardTitle className="text-2xl">Student Login</CardTitle>
+            <CardTitle className="text-2xl">{t('login.title')}</CardTitle>
             <CardDescription>
-              Enter your email and password to access your dashboard
+              {t('login.email')} & {t('login.password')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -90,7 +97,7 @@ export default function LoginPage() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
+                      <FormLabel>{t('login.email')}</FormLabel>
                       <FormControl>
                         <Input
                           type="email"
@@ -109,7 +116,7 @@ export default function LoginPage() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Password</FormLabel>
+                      <FormLabel>{t('login.password')}</FormLabel>
                       <FormControl>
                         <Input
                           type="password"
@@ -123,6 +130,14 @@ export default function LoginPage() {
                   )}
                 />
 
+                <div className="text-right">
+                  <Link href="/forgot-password">
+                    <Button variant="link" className="p-0 h-auto text-xs text-muted-foreground">
+                      {t('login.forgotPassword')}
+                    </Button>
+                  </Link>
+                </div>
+
                 <Button
                   type="submit"
                   className="w-full"
@@ -132,20 +147,20 @@ export default function LoginPage() {
                   {loginMutation.isPending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Logging in...
+                      {t('login.loggingIn')}
                     </>
                   ) : (
-                    "Login"
+                    t('login.submitButton')
                   )}
                 </Button>
               </form>
             </Form>
 
             <div className="mt-6 text-center text-sm text-muted-foreground">
-              Don't have an account?{" "}
-              <Link href="/">
+              {t('login.noAccount')}{" "}
+              <Link href="/register">
                 <Button variant="ghost" className="p-0 h-auto underline" data-testid="link-register">
-                  Register now
+                  {t('login.registerHere')}
                 </Button>
               </Link>
             </div>

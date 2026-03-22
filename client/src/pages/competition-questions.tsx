@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Clock, CheckCircle, Loader2, HelpCircle } from "lucide-react";
 import type { Question, Submission, CompetitionSettings, Answer } from "@shared/schema";
+import { useTranslation } from "react-i18next";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +38,7 @@ export default function CompetitionQuestionsPage() {
   const { token } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [showFinishDialog, setShowFinishDialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,6 +48,17 @@ export default function CompetitionQuestionsPage() {
     queryKey: ["/api/student/questions"],
     enabled: !!token,
   });
+
+  // Block copy shortcuts on questions page
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && ["c", "a", "u", "s"].includes(e.key.toLowerCase())) {
+        e.preventDefault();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (data?.answers) {
@@ -76,15 +89,16 @@ export default function CompetitionQuestionsPage() {
       const result = await res.json();
 
       queryClient.invalidateQueries({ queryKey: ["/api/student/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/student/my-results"] });
       toast({
-        title: "Submission received!",
-        description: "Your answers have been submitted successfully. Results will be available once published.",
+        title: t('questions.submissionReceived'),
+        description: t('questions.viewResults'),
       });
-      navigate("/dashboard");
+      navigate("/competition/results");
     } catch (error: any) {
       toast({
-        title: "Failed to submit",
-        description: error.message || "Something went wrong",
+        title: t('landing.failedToSubmit'),
+        description: error.message || t('landing.somethingWentWrong'),
         variant: "destructive",
       });
       finishingRef.current = false;
@@ -95,8 +109,8 @@ export default function CompetitionQuestionsPage() {
   const handleTimeUp = () => {
     if (finishingRef.current) return;
     toast({
-      title: "Time's up!",
-      description: "Auto-submitting your answers.",
+      title: t('landing.timesUp'),
+      description: t('landing.autoSubmitting'),
       variant: "destructive",
     });
     saveAllAnswersAndFinish();
@@ -110,31 +124,38 @@ export default function CompetitionQuestionsPage() {
 
   useEffect(() => {
     if (hasCompletedCompetition) {
-      navigate("/dashboard");
+      navigate("/competition/results");
     }
   }, [hasCompletedCompetition, navigate]);
 
+  // Auto-submit ONLY if answering was started before competition ended
   useEffect(() => {
     if (!data?.settings?.competitionEndTime || isSubmitting || hasCompletedCompetition) return;
-    
+    // Only auto-submit if the student actually started answering (reading was completed)
+    if (!data?.submission?.readingEndAt) return;
+
     const competitionEnd = new Date(data.settings.competitionEndTime);
+    const readingEnded = new Date(data.submission.readingEndAt);
     const now = new Date();
-    
+
+    // If reading ended after competition ended, don't auto-submit
+    if (readingEnded > competitionEnd) return;
+
     const triggerAutoSubmit = () => {
       if (finishingRef.current || isSubmitting) return;
       toast({
-        title: "Competition has ended",
-        description: "Your submission has been saved.",
+        title: t('landing.competitionHasEnded'),
+        description: t('landing.submissionSaved'),
         variant: "destructive",
       });
       saveAllAnswersAndFinish();
     };
-    
+
     if (now > competitionEnd) {
       triggerAutoSubmit();
       return;
     }
-    
+
     const timeUntilEnd = competitionEnd.getTime() - now.getTime();
     if (timeUntilEnd > 0) {
       const timeout = setTimeout(triggerAutoSubmit, timeUntilEnd);
@@ -162,12 +183,12 @@ export default function CompetitionQuestionsPage() {
         <Card className="max-w-md w-full">
           <CardContent className="pt-6 text-center space-y-4">
             <HelpCircle className="h-12 w-12 text-yellow-500 mx-auto" />
-            <h2 className="text-xl font-semibold">Reading Not Completed</h2>
+            <h2 className="text-xl font-semibold">{t('questions.readingNotCompleted')}</h2>
             <p className="text-muted-foreground">
-              Please complete the reading section first.
+              {t('questions.completeReadingFirst')}
             </p>
             <Button onClick={() => navigate("/competition/read")} data-testid="button-go-reading">
-              Go to Reading
+              {t('questions.goToReading')}
             </Button>
           </CardContent>
         </Card>
@@ -187,17 +208,17 @@ export default function CompetitionQuestionsPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-50 border-b bg-card">
         <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <HelpCircle className="h-5 w-5 text-primary" />
-              <span className="font-semibold">Questions</span>
-              <Badge variant="secondary">
-                {answeredCount}/{totalQuestions} answered
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <HelpCircle className="h-5 w-5 text-primary shrink-0" />
+              <span className="font-semibold hidden sm:inline">{t('questions.title')}</span>
+              <Badge variant="secondary" className="shrink-0 text-xs sm:text-sm">
+                {answeredCount}/{totalQuestions}
               </Badge>
             </div>
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-1.5 sm:gap-2 text-sm shrink-0">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground hidden sm:inline">Time remaining:</span>
+              <span className="text-muted-foreground hidden sm:inline">{t('reading.timeRemaining')}:</span>
               <DurationTimer
                 startTime={answerStart}
                 durationMinutes={durationMinutes}
@@ -210,8 +231,15 @@ export default function CompetitionQuestionsPage() {
         </div>
       </header>
 
-      <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="max-w-3xl mx-auto space-y-6">
+      <main
+        className="flex-1 container mx-auto px-3 sm:px-4 py-4 sm:py-8 select-none"
+        style={{ WebkitUserSelect: "none", userSelect: "none" }}
+        onCopy={(e) => e.preventDefault()}
+        onCut={(e) => e.preventDefault()}
+        onContextMenu={(e) => e.preventDefault()}
+        onDragStart={(e) => e.preventDefault()}
+      >
+        <div className="max-w-3xl mx-auto space-y-4 sm:space-y-6">
           {data.questions?.map((question, index) => {
             const options = question.optionsJson ? JSON.parse(question.optionsJson) : null;
             const currentAnswer = answers[question.id] || "";
@@ -256,10 +284,11 @@ export default function CompetitionQuestionsPage() {
                     </RadioGroup>
                   ) : (
                     <Textarea
-                      placeholder="Type your answer here..."
+                      placeholder={t('questions.typeAnswer')}
                       value={currentAnswer}
                       onChange={(e) => handleAnswerChange(question.id, e.target.value)}
                       className="min-h-24"
+                      style={{ WebkitUserSelect: "text", userSelect: "text" }}
                       data-testid={`textarea-${question.id}`}
                     />
                   )}
@@ -282,12 +311,12 @@ export default function CompetitionQuestionsPage() {
             {isSubmitting ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin" />
-                Submitting...
+                {t('questions.submitting')}
               </>
             ) : (
               <>
                 <CheckCircle className="h-5 w-5" />
-                Finish Competition
+                {t('questions.finishCompetition')}
               </>
             )}
           </Button>
@@ -297,15 +326,13 @@ export default function CompetitionQuestionsPage() {
       <AlertDialog open={showFinishDialog} onOpenChange={setShowFinishDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Finish Competition?</AlertDialogTitle>
+            <AlertDialogTitle>{t('questions.finishCompetitionTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              You have answered {answeredCount} of {totalQuestions} questions.
-              Your answers will be saved and submitted automatically.
-              This action cannot be undone.
+              {t('questions.finishCompetitionDesc', { answered: answeredCount, total: totalQuestions })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Continue Answering</AlertDialogCancel>
+            <AlertDialogCancel>{t('questions.continueAnswering')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => saveAllAnswersAndFinish()}
               disabled={isSubmitting}
@@ -314,10 +341,10 @@ export default function CompetitionQuestionsPage() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Submitting...
+                  {t('questions.submitting')}
                 </>
               ) : (
-                "Submit Answers"
+                t('questions.submitAnswers')
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

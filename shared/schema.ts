@@ -1,15 +1,30 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, pgEnum, uniqueIndex, real } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, pgEnum, uniqueIndex, real, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// ─── Enums ───────────────────────────────────────────────────────────────────
 export const roleEnum = pgEnum("role", ["STUDENT", "ADMIN"]);
 export const categoryEnum = pgEnum("category", ["kid", "teen", "adult"]);
 export const genderEnum = pgEnum("gender", ["male", "female", "other"]);
 export const questionTypeEnum = pgEnum("question_type", ["MCQ", "TEXT"]);
 export const submissionStatusEnum = pgEnum("submission_status", ["SUBMITTED", "REVIEWED", "FINALIZED"]);
 export const competitionStatusEnum = pgEnum("competition_status", ["DRAFT", "ACTIVE", "CLOSED"]);
+export const languageEnum = pgEnum("language", ["tr", "en", "de", "pl", "fr", "vi", "hi"]);
 
+export const SUPPORTED_LANGUAGES = [
+  { code: "tr", name: "Türkçe", flag: "🇹🇷" },
+  { code: "en", name: "English", flag: "🇬🇧" },
+  { code: "de", name: "Deutsch", flag: "🇩🇪" },
+  { code: "pl", name: "Polski", flag: "🇵🇱" },
+  { code: "fr", name: "Français", flag: "🇫🇷" },
+  { code: "vi", name: "Tiếng Việt", flag: "🇻🇳" },
+  { code: "hi", name: "हिन्दी", flag: "🇮🇳" },
+] as const;
+
+export type Language = "tr" | "en" | "de" | "pl" | "fr" | "vi" | "hi";
+
+// ─── Core Tables ─────────────────────────────────────────────────────────────
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: text("email"),
@@ -26,6 +41,21 @@ export const users = pgTable("users", {
   affiliateCode: text("affiliate_code").unique(),
   referrerId: varchar("referrer_id"),
   referralPoints: integer("referral_points").default(0),
+  preferredLanguage: text("preferred_language").default("tr"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("users_email_idx").on(table.email),
+  index("users_category_idx").on(table.category),
+  index("users_affiliate_code_idx").on(table.affiliateCode),
+  index("users_referrer_id_idx").on(table.referrerId),
+]);
+
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -73,35 +103,50 @@ export const competitions = pgTable("competitions", {
   readingDurationMinutes: integer("reading_duration_minutes").default(30),
   answeringDurationMinutes: integer("answering_duration_minutes").default(15),
   status: competitionStatusEnum("status").notNull().default("DRAFT"),
+  prizeContent: text("prize_content"),
+  titleTranslations: text("title_translations"),
+  descriptionTranslations: text("description_translations"),
+  prizeTranslations: text("prize_translations"),
+  supportedLanguages: text("supported_languages").default("tr"),
   resultsPublishedAt: timestamp("results_published_at"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("competitions_category_idx").on(table.category),
+  index("competitions_status_idx").on(table.status),
+]);
 
 export const competitionBooks = pgTable("competition_books", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   competitionId: varchar("competition_id").notNull().references(() => competitions.id, { onDelete: "cascade" }),
+  language: text("language").notNull().default("tr"),
   title: text("title").notNull(),
   fileUrl: text("file_url"),
   content: text("content"),
   wordCount: integer("word_count").default(0),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("competition_book_lang_unique").on(table.competitionId, table.language),
+]);
 
 export const competitionQuestions = pgTable("competition_questions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   competitionId: varchar("competition_id").notNull().references(() => competitions.id, { onDelete: "cascade" }),
+  language: text("language").notNull().default("tr"),
   type: questionTypeEnum("type").notNull(),
   prompt: text("prompt").notNull(),
   optionsJson: text("options_json"),
   correctAnswer: text("correct_answer"),
   maxPoints: integer("max_points").default(1),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("competition_questions_lang_idx").on(table.competitionId, table.language),
+]);
 
 export const competitionRegistrations = pgTable("competition_registrations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   competitionId: varchar("competition_id").notNull().references(() => competitions.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  language: text("language").notNull().default("tr"),
   registeredAt: timestamp("registered_at").defaultNow(),
 }, (table) => [
   uniqueIndex("competition_user_unique").on(table.competitionId, table.userId),
@@ -112,6 +157,7 @@ export const submissions = pgTable("submissions", {
   userId: varchar("user_id").notNull().references(() => users.id),
   competitionId: varchar("competition_id").references(() => competitions.id),
   category: categoryEnum("category").notNull(),
+  language: text("language").default("tr"),
   readingStartAt: timestamp("reading_start_at"),
   readingEndAt: timestamp("reading_end_at"),
   answerStartAt: timestamp("answer_start_at"),
@@ -129,7 +175,12 @@ export const submissions = pgTable("submissions", {
   status: submissionStatusEnum("status").default("SUBMITTED"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("submissions_user_idx").on(table.userId),
+  index("submissions_competition_idx").on(table.competitionId),
+  index("submissions_category_idx").on(table.category),
+  index("submissions_final_score_idx").on(table.finalScore),
+]);
 
 export const answers = pgTable("answers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -140,7 +191,9 @@ export const answers = pgTable("answers", {
   value: text("value"),
   isCorrect: boolean("is_correct"),
   points: integer("points").default(0),
-});
+}, (table) => [
+  index("answers_submission_idx").on(table.submissionId),
+]);
 
 export const prizes = pgTable("prizes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -148,6 +201,68 @@ export const prizes = pgTable("prizes", {
   content: text("content"),
 });
 
+// ─── Marketing Tables ────────────────────────────────────────────────────────
+
+export const testimonials = pgTable("testimonials", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  category: categoryEnum("category"),
+  quote: text("quote").notNull(),
+  role: text("role"), // "parent", "student", "teacher"
+  avatarUrl: text("avatar_url"),
+  rating: integer("rating").default(5),
+  isPublished: boolean("is_published").default(false),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const banners = pgTable("banners", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  linkUrl: text("link_url"),
+  linkText: text("link_text"),
+  bgColor: text("bg_color").default("#3b82f6"),
+  textColor: text("text_color").default("#ffffff"),
+  isActive: boolean("is_active").default(false),
+  position: text("position").default("top"), // "top", "hero", "footer"
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const subscribers = pgTable("subscribers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  name: text("name"),
+  source: text("source").default("website"), // "website", "registration", "referral"
+  isActive: boolean("is_active").default(true),
+  subscribedAt: timestamp("subscribed_at").defaultNow(),
+  unsubscribedAt: timestamp("unsubscribed_at"),
+});
+
+export const socialShares = pgTable("social_shares", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  platform: text("platform").notNull(), // "twitter", "facebook", "whatsapp", "linkedin", "copy"
+  shareType: text("share_type").notNull(), // "result", "competition", "referral"
+  referenceId: varchar("reference_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("social_shares_user_idx").on(table.userId),
+]);
+
+export const siteStats = pgTable("site_stats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(), // "total_readers", "books_read", "avg_wpm", "competitions_held"
+  value: text("value").notNull(),
+  label: text("label").notNull(),
+  icon: text("icon"),
+  sortOrder: integer("sort_order").default(0),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ─── Relations ───────────────────────────────────────────────────────────────
 export const usersRelations = relations(users, ({ one, many }) => ({
   referrer: one(users, {
     fields: [users.referrerId],
@@ -157,6 +272,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   referrals: many(users, { relationName: "referrals" }),
   submissions: many(submissions),
   registrations: many(competitionRegistrations),
+  socialShares: many(socialShares),
 }));
 
 export const competitionsRelations = relations(competitions, ({ many }) => ({
@@ -218,6 +334,14 @@ export const answersRelations = relations(answers, ({ one }) => ({
   }),
 }));
 
+export const socialSharesRelations = relations(socialShares, ({ one }) => ({
+  user: one(users, {
+    fields: [socialShares.userId],
+    references: [users.id],
+  }),
+}));
+
+// ─── Zod Schemas ─────────────────────────────────────────────────────────────
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   referralPoints: true,
@@ -248,54 +372,23 @@ export const adminLoginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
-export const insertCompetitionSettingsSchema = createInsertSchema(competitionSettings).omit({
-  id: true,
-});
+export const insertCompetitionSettingsSchema = createInsertSchema(competitionSettings).omit({ id: true });
+export const insertBookSchema = createInsertSchema(books).omit({ id: true, createdAt: true });
+export const insertQuestionSchema = createInsertSchema(questions).omit({ id: true, createdAt: true });
+export const insertCompetitionSchema = createInsertSchema(competitions).omit({ id: true, createdAt: true });
+export const insertCompetitionBookSchema = createInsertSchema(competitionBooks).omit({ id: true, createdAt: true });
+export const insertCompetitionQuestionSchema = createInsertSchema(competitionQuestions).omit({ id: true, createdAt: true });
+export const insertCompetitionRegistrationSchema = createInsertSchema(competitionRegistrations).omit({ id: true, registeredAt: true });
+export const insertSubmissionSchema = createInsertSchema(submissions).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAnswerSchema = createInsertSchema(answers).omit({ id: true });
+export const insertPrizeSchema = createInsertSchema(prizes).omit({ id: true });
+export const insertTestimonialSchema = createInsertSchema(testimonials).omit({ id: true, createdAt: true });
+export const insertBannerSchema = createInsertSchema(banners).omit({ id: true, createdAt: true });
+export const insertSubscriberSchema = createInsertSchema(subscribers).omit({ id: true, subscribedAt: true, unsubscribedAt: true });
+export const insertSocialShareSchema = createInsertSchema(socialShares).omit({ id: true, createdAt: true });
+export const insertSiteStatSchema = createInsertSchema(siteStats).omit({ id: true, updatedAt: true });
 
-export const insertBookSchema = createInsertSchema(books).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertQuestionSchema = createInsertSchema(questions).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertCompetitionSchema = createInsertSchema(competitions).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertCompetitionBookSchema = createInsertSchema(competitionBooks).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertCompetitionQuestionSchema = createInsertSchema(competitionQuestions).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertCompetitionRegistrationSchema = createInsertSchema(competitionRegistrations).omit({
-  id: true,
-  registeredAt: true,
-});
-
-export const insertSubmissionSchema = createInsertSchema(submissions).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertAnswerSchema = createInsertSchema(answers).omit({
-  id: true,
-});
-
-export const insertPrizeSchema = createInsertSchema(prizes).omit({
-  id: true,
-});
-
+// ─── Types ───────────────────────────────────────────────────────────────────
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
@@ -331,6 +424,21 @@ export type InsertAnswer = z.infer<typeof insertAnswerSchema>;
 
 export type Prize = typeof prizes.$inferSelect;
 export type InsertPrize = z.infer<typeof insertPrizeSchema>;
+
+export type Testimonial = typeof testimonials.$inferSelect;
+export type InsertTestimonial = z.infer<typeof insertTestimonialSchema>;
+
+export type Banner = typeof banners.$inferSelect;
+export type InsertBanner = z.infer<typeof insertBannerSchema>;
+
+export type Subscriber = typeof subscribers.$inferSelect;
+export type InsertSubscriber = z.infer<typeof insertSubscriberSchema>;
+
+export type SocialShare = typeof socialShares.$inferSelect;
+export type InsertSocialShare = z.infer<typeof insertSocialShareSchema>;
+
+export type SiteStat = typeof siteStats.$inferSelect;
+export type InsertSiteStat = z.infer<typeof insertSiteStatSchema>;
 
 export type Category = "kid" | "teen" | "adult";
 export type Role = "STUDENT" | "ADMIN";

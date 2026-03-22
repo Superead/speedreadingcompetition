@@ -11,10 +11,26 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
-import { ArrowLeft, Loader2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { Category, Competition } from "@shared/schema";
+import { SUPPORTED_LANGUAGES } from "@shared/schema";
+import { useTranslation } from "react-i18next";
+import { changeLanguage } from "@/lib/i18n";
+import i18n from "@/lib/i18n";
+
+function getLocalizedCompField(comp: any, field: string, lang: string): string {
+  const key = field === 'prizeContent' ? 'prizeTranslations' : `${field}Translations`;
+  const raw = comp?.[key];
+  if (raw) {
+    try {
+      const translations = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (translations[lang]) return translations[lang];
+    } catch {}
+  }
+  return comp?.[field] || "";
+}
 
 function getAgeFromBirthdate(birthdate: string): number {
   const today = new Date();
@@ -27,14 +43,26 @@ function getAgeFromBirthdate(birthdate: string): number {
   return age;
 }
 
-function getAgeRange(category: Category): { min: number; max: number | null; label: string } {
+function getCategoryFromAge(age: number): Category | null {
+  if (age >= 6 && age <= 12) return "kid";
+  if (age >= 13 && age <= 17) return "teen";
+  if (age >= 18) return "adult";
+  return null;
+}
+
+function getCategoryTitle(category: Category) {
   switch (category) {
-    case "kid":
-      return { min: 6, max: 12, label: "6-12 years old" };
-    case "teen":
-      return { min: 13, max: 17, label: "13-17 years old" };
-    case "adult":
-      return { min: 18, max: null, label: "18 years or older" };
+    case "kid": return "Kids (6-12)";
+    case "teen": return "Teens (13-17)";
+    case "adult": return "Adults (18+)";
+  }
+}
+
+function getCategoryColor(category: Category) {
+  switch (category) {
+    case "kid": return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
+    case "teen": return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+    case "adult": return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400";
   }
 }
 
@@ -49,54 +77,21 @@ const registerFormSchema = z.object({
   city: z.string().optional(),
   country: z.string().optional(),
   referralCode: z.string().optional(),
+  preferredLanguage: z.string().optional(),
 });
 
 type RegisterFormData = z.infer<typeof registerFormSchema>;
 
-function getCategoryTitle(category: Category) {
-  switch (category) {
-    case "kid":
-      return "Kids";
-    case "teen":
-      return "Teens";
-    case "adult":
-      return "Adults";
-  }
-}
-
-function getCategoryColor(category: Category) {
-  switch (category) {
-    case "kid":
-      return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
-    case "teen":
-      return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
-    case "adult":
-      return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400";
-  }
-}
-
-function isRegistrationOpenForCompetition(comp: Competition): boolean {
-  if (!comp.registrationStartTime || !comp.registrationEndTime) return false;
-  const now = new Date();
-  const start = new Date(comp.registrationStartTime);
-  const end = new Date(comp.registrationEndTime);
-  return now >= start && now <= end;
-}
-
 export default function RegisterPage() {
-  const params = useParams<{ category: string }>();
-  const category = params.category as Category;
+  const params = useParams<{ category?: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { login } = useAuth();
+  const { t } = useTranslation();
 
-  const { data: competitions, isLoading: competitionsLoading } = useQuery<Competition[]>({
+  const { data: competitions } = useQuery<Competition[]>({
     queryKey: ["/api/competitions/public"],
   });
-
-  const categoryCompetitions = competitions?.filter(c => c.category === category) || [];
-  const hasRegistrationOpen = categoryCompetitions.some(c => isRegistrationOpenForCompetition(c));
-  const ageRange = getAgeRange(category);
 
   const form = useForm<RegisterFormData>({
     resolver: zodResolver(registerFormSchema),
@@ -111,39 +106,50 @@ export default function RegisterPage() {
       city: "",
       country: "",
       referralCode: "",
+      preferredLanguage: "tr",
     },
   });
 
   const birthdate = form.watch("birthdate");
-  const ageError = (() => {
-    if (!birthdate) return null;
-    const age = getAgeFromBirthdate(birthdate);
-    if (age < 0) return "Invalid date of birth";
-    if (category === "kid" && (age < ageRange.min || age > ageRange.max!)) {
-      return `Kids category is for ages ${ageRange.label}. You are ${age} years old.`;
-    }
-    if (category === "teen" && (age < ageRange.min || age > ageRange.max!)) {
-      return `Teens category is for ages ${ageRange.label}. You are ${age} years old.`;
-    }
-    if (category === "adult" && age < ageRange.min) {
-      return `Adults category is for ages ${ageRange.label}. You are ${age} years old.`;
-    }
-    return null;
-  })();
+
+  // Auto-detect category from birthdate, or use URL param as fallback
+  const detectedCategory: Category | null = birthdate
+    ? getCategoryFromAge(getAgeFromBirthdate(birthdate))
+    : (params.category && ["kid", "teen", "adult"].includes(params.category))
+      ? (params.category as Category)
+      : null;
+
+  const age = birthdate ? getAgeFromBirthdate(birthdate) : null;
+  const ageError = age !== null && age < 6 ? "You must be at least 6 years old to register." : null;
+
+  // Check if there's an active competition for the detected category
+  const activeCompetition = detectedCategory
+    ? competitions?.find(c => c.category === detectedCategory && c.status === "ACTIVE")
+    : null;
+
+  // Always show all supported languages so users can pick their preferred competition language
+  const competitionLanguages = activeCompetition
+    ? ((activeCompetition as any).supportedLanguages || "tr").split(",").filter(Boolean)
+    : SUPPORTED_LANGUAGES.map(l => l.code);
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterFormData) => {
       const res = await apiRequest("POST", "/api/auth/register", {
         ...data,
-        category,
+        category: detectedCategory,
+        preferredLanguage: data.preferredLanguage || "tr",
       });
       return res.json();
     },
     onSuccess: (data) => {
       login(data.token, data.user);
+      // Sync i18n with chosen language
+      if (data.user.preferredLanguage) {
+        changeLanguage(data.user.preferredLanguage);
+      }
       toast({
-        title: "Registration successful!",
-        description: `Welcome, ${data.user.name}! Your affiliate code is ${data.user.affiliateCode}`,
+        title: t('register.success'),
+        description: t('register.welcome', { name: data.user.name }),
       });
       navigate("/dashboard");
     },
@@ -158,30 +164,15 @@ export default function RegisterPage() {
 
   const onSubmit = (data: RegisterFormData) => {
     if (ageError) {
-      toast({
-        title: "Age mismatch",
-        description: ageError,
-        variant: "destructive",
-      });
+      toast({ title: "Age restriction", description: ageError, variant: "destructive" });
+      return;
+    }
+    if (!detectedCategory) {
+      toast({ title: "Date of birth required", description: "Please enter your date of birth so we can assign you to the right category.", variant: "destructive" });
       return;
     }
     registerMutation.mutate(data);
   };
-
-  if (!["kid", "teen", "adult"].includes(category)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6 text-center">
-            <p className="text-muted-foreground">Invalid category</p>
-            <Link href="/">
-              <Button variant="ghost">Go back home</Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background py-8 px-4">
@@ -189,217 +180,249 @@ export default function RegisterPage() {
         <Link href="/">
           <Button variant="ghost" size="sm" className="gap-2" data-testid="button-back-home">
             <ArrowLeft className="h-4 w-4" />
-            Back to categories
+            {t('register.backToHome')}
           </Button>
         </Link>
 
         <Card>
           <CardHeader className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Badge className={getCategoryColor(category)}>{getCategoryTitle(category)}</Badge>
-              <span className="text-sm text-muted-foreground">Ages {ageRange.label}</span>
-            </div>
-            <CardTitle className="text-2xl">Register for Competition</CardTitle>
+            <CardTitle className="text-2xl">{t('register.title')}</CardTitle>
             <CardDescription>
-              Fill in your details to register for the {getCategoryTitle(category)} speed reading competition.
+              {t('register.subtitle')}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {competitionsLoading ? (
-              <div className="text-center py-6">
-                <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-              </div>
-            ) : !hasRegistrationOpen ? (
-              <div className="text-center py-6 space-y-4">
-                <AlertTriangle className="h-10 w-10 text-muted-foreground mx-auto" />
-                <p className="text-muted-foreground">
-                  Registration is currently closed for this category.
-                </p>
-                <Link href="/">
-                  <Button variant="outline" data-testid="button-view-categories">View all categories</Button>
-                </Link>
-              </div>
-            ) : (
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>First Name *</FormLabel>
-                          <FormControl>
-                            <Input placeholder="John" {...field} data-testid="input-name" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('register.firstName')} *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="John" {...field} data-testid="input-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="surname"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('register.lastName')} *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Doe" {...field} data-testid="input-surname" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="birthdate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('register.dateOfBirth')} *</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} data-testid="input-birthdate" />
+                      </FormControl>
+                      <FormMessage />
+                      {ageError && (
+                        <Alert variant="destructive" className="mt-2">
+                          <AlertTriangle className="h-4 w-4" />
+                          <AlertDescription>{t('register.ageError')}</AlertDescription>
+                        </Alert>
                       )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="surname"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Last Name *</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Doe" {...field} data-testid="input-surname" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
+                      {detectedCategory && !ageError && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          <span className="text-sm text-muted-foreground">
+                            {t('register.category')}: <Badge className={getCategoryColor(detectedCategory)}>{getCategoryTitle(detectedCategory)}</Badge>
+                          </span>
+                          {activeCompetition && (
+                            <span className="text-xs text-green-600 ml-1">• {getLocalizedCompField(activeCompetition, 'title', i18n.language) || activeCompetition.title}</span>
+                          )}
+                        </div>
                       )}
-                    />
-                  </div>
+                    </FormItem>
+                  )}
+                />
 
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('register.email')} *</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="your@email.com" {...field} data-testid="input-email" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('register.password')} *</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder={t('register.passwordHint')} {...field} data-testid="input-password" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="gender"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('register.gender')}</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-gender">
+                            <SelectValue placeholder={t('register.selectGender')} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="male">{t('register.genderMale')}</SelectItem>
+                          <SelectItem value="female">{t('register.genderFemale')}</SelectItem>
+                          <SelectItem value="other">{t('register.genderOther')}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('register.phone')}</FormLabel>
+                      <FormControl>
+                        <Input placeholder="+90 5XX XXX XXXX" {...field} data-testid="input-phone" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="email"
+                    name="city"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email *</FormLabel>
+                        <FormLabel>{t('register.city')}</FormLabel>
                         <FormControl>
-                          <Input type="email" placeholder="your@email.com" {...field} data-testid="input-email" />
+                          <Input placeholder="Istanbul" {...field} data-testid="input-city" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-
                   <FormField
                     control={form.control}
-                    name="password"
+                    name="country"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Password *</FormLabel>
+                        <FormLabel>{t('register.country')}</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="Min 6 characters" {...field} data-testid="input-password" />
+                          <Input placeholder="Turkey" {...field} data-testid="input-country" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                </div>
 
-                  <FormField
+                <FormField
                     control={form.control}
-                    name="gender"
+                    name="preferredLanguage"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Gender</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-gender">
-                              <SelectValue placeholder="Select gender" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="male">Male</SelectItem>
-                            <SelectItem value="female">Female</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="birthdate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Date of Birth *</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} data-testid="input-birthdate" />
-                        </FormControl>
-                        <FormMessage />
-                        {ageError && (
-                          <Alert variant="destructive" className="mt-2">
-                            <AlertTriangle className="h-4 w-4" />
-                            <AlertDescription data-testid="text-age-error">{ageError}</AlertDescription>
-                          </Alert>
-                        )}
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone Number</FormLabel>
-                        <FormControl>
-                          <Input placeholder="+1 234 567 8900" {...field} data-testid="input-phone" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="city"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>City</FormLabel>
-                          <FormControl>
-                            <Input placeholder="New York" {...field} data-testid="input-city" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="country"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Country</FormLabel>
-                          <FormControl>
-                            <Input placeholder="USA" {...field} data-testid="input-country" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="referralCode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Referral Code (optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="ABC123" {...field} data-testid="input-referral-code" />
-                        </FormControl>
+                        <FormLabel>{t('register.competitionLanguage')} *</FormLabel>
                         <FormDescription>
-                          Enter a friend's code to give them referral points
+                          {t('register.languageHint')}
                         </FormDescription>
+                        <div className="flex flex-wrap gap-2">
+                          {competitionLanguages.map((code: string) => {
+                            const lang = SUPPORTED_LANGUAGES.find(l => l.code === code);
+                            if (!lang) return null;
+                            return (
+                              <Button
+                                key={code}
+                                type="button"
+                                size="sm"
+                                variant={field.value === code ? "default" : "outline"}
+                                onClick={() => field.onChange(code)}
+                                data-testid={`lang-pick-${code}`}
+                              >
+                                {lang.flag} {lang.name}
+                              </Button>
+                            );
+                          })}
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
 
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={registerMutation.isPending || !!ageError}
-                    data-testid="button-register-submit"
-                  >
-                    {registerMutation.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Registering...
-                      </>
-                    ) : (
-                      "Register"
-                    )}
-                  </Button>
-                </form>
-              </Form>
-            )}
+                <FormField
+                  control={form.control}
+                  name="referralCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('register.referralCode')}</FormLabel>
+                      <FormControl>
+                        <Input placeholder="ABC123" {...field} data-testid="input-referral-code" />
+                      </FormControl>
+                      <FormDescription>
+                        {t('register.referralHint')}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={registerMutation.isPending || !!ageError || !detectedCategory}
+                  data-testid="button-register-submit"
+                >
+                  {registerMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {t('register.registering')}
+                    </>
+                  ) : (
+                    t('register.submitButton')
+                  )}
+                </Button>
+
+                <div className="text-center text-sm text-muted-foreground">
+                  {t('register.alreadyHaveAccount')}{" "}
+                  <Link href="/login">
+                    <Button variant="ghost" className="p-0 h-auto underline">
+                      {t('register.loginHere')}
+                    </Button>
+                  </Link>
+                </div>
+              </form>
+            </Form>
           </CardContent>
         </Card>
       </div>

@@ -1,16 +1,22 @@
-import { 
+import {
   users, competitionSettings, books, questions, submissions, answers, prizes,
   competitions, competitionBooks, competitionQuestions, competitionRegistrations,
+  testimonials, banners, subscribers, socialShares, siteStats,
   type User, type InsertUser, type CompetitionSettings, type InsertCompetitionSettings,
   type Book, type InsertBook, type Question, type InsertQuestion,
   type Submission, type InsertSubmission, type Answer, type InsertAnswer,
   type Prize, type InsertPrize, type Category, type SubmissionStatus,
   type Competition, type InsertCompetition, type CompetitionBook, type InsertCompetitionBook,
   type CompetitionQuestion, type InsertCompetitionQuestion,
-  type CompetitionRegistration, type InsertCompetitionRegistration, type CompetitionStatus
+  type CompetitionRegistration, type InsertCompetitionRegistration, type CompetitionStatus,
+  type Testimonial, type InsertTestimonial,
+  type Banner, type InsertBanner,
+  type Subscriber, type InsertSubscriber,
+  type SocialShare, type InsertSocialShare,
+  type SiteStat, type InsertSiteStat
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, sql, ne, gte, lte, notInArray, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, sql, ne, gte, lte, notInArray, inArray, count, avg, isNull } from "drizzle-orm";
 
 export interface SubmissionWithUser extends Submission {
   userName: string;
@@ -22,7 +28,7 @@ export interface SubmissionWithUser extends Submission {
 export interface SubmissionWithDetails extends Submission {
   user: User;
   referrer?: User;
-  answers: (Answer & { question: Question })[];
+  answers: (Answer & { question: any })[];
 }
 
 export interface LeaderboardEntry {
@@ -42,6 +48,18 @@ export interface CompetitionWithDetails extends Competition {
   book?: CompetitionBook;
   questionCount: number;
   registrationCount: number;
+}
+
+export interface AdminAnalytics {
+  totalUsers: number;
+  totalSubmissions: number;
+  avgWPM: number;
+  registrationsByDay: { date: string; count: number }[];
+}
+
+export interface ShareStats {
+  platform: string;
+  count: number;
 }
 
 export interface IStorage {
@@ -109,12 +127,13 @@ export interface IStorage {
   unpublishCompetitionResults(id: string): Promise<Competition | undefined>;
 
   // Competition Books
-  getCompetitionBook(competitionId: string): Promise<CompetitionBook | undefined>;
-  upsertCompetitionBook(competitionId: string, data: Partial<InsertCompetitionBook>): Promise<CompetitionBook>;
-  deleteCompetitionBook(competitionId: string): Promise<void>;
+  getCompetitionBook(competitionId: string, language?: string): Promise<CompetitionBook | undefined>;
+  getCompetitionBooks(competitionId: string): Promise<CompetitionBook[]>;
+  upsertCompetitionBook(competitionId: string, data: Partial<InsertCompetitionBook>, language?: string): Promise<CompetitionBook>;
+  deleteCompetitionBook(competitionId: string, language?: string): Promise<void>;
 
   // Competition Questions
-  getCompetitionQuestions(competitionId: string): Promise<CompetitionQuestion[]>;
+  getCompetitionQuestions(competitionId: string, language?: string): Promise<CompetitionQuestion[]>;
   getCompetitionQuestion(id: string): Promise<CompetitionQuestion | undefined>;
   createCompetitionQuestion(data: InsertCompetitionQuestion): Promise<CompetitionQuestion>;
   updateCompetitionQuestion(id: string, data: Partial<InsertCompetitionQuestion>): Promise<CompetitionQuestion | undefined>;
@@ -124,13 +143,45 @@ export interface IStorage {
   getRegistration(competitionId: string, userId: string): Promise<CompetitionRegistration | undefined>;
   getUserRegistrations(userId: string): Promise<CompetitionRegistration[]>;
   getCompetitionRegistrations(competitionId: string): Promise<CompetitionRegistration[]>;
-  registerForCompetition(competitionId: string, userId: string): Promise<CompetitionRegistration>;
+  registerForCompetition(competitionId: string, userId: string, language?: string): Promise<CompetitionRegistration>;
 
   // Competition Submissions
   getCompetitionSubmission(competitionId: string, userId: string): Promise<Submission | undefined>;
   getCompetitionSubmissions(competitionId: string): Promise<SubmissionWithUser[]>;
   getCompetitionLeaderboard(competitionId: string): Promise<LeaderboardEntry[]>;
   getAdminCompetitionLeaderboard(competitionId: string): Promise<LeaderboardEntry[]>;
+
+  // Testimonials
+  getPublishedTestimonials(): Promise<Testimonial[]>;
+  getAllTestimonials(): Promise<Testimonial[]>;
+  createTestimonial(data: InsertTestimonial): Promise<Testimonial>;
+  updateTestimonial(id: string, data: Partial<InsertTestimonial>): Promise<Testimonial | undefined>;
+  deleteTestimonial(id: string): Promise<void>;
+
+  // Banners
+  getActiveBanners(position?: string): Promise<Banner[]>;
+  getAllBanners(): Promise<Banner[]>;
+  createBanner(data: InsertBanner): Promise<Banner>;
+  updateBanner(id: string, data: Partial<InsertBanner>): Promise<Banner | undefined>;
+  deleteBanner(id: string): Promise<void>;
+
+  // Subscribers
+  subscribe(email: string, name?: string, source?: string): Promise<Subscriber>;
+  unsubscribe(email: string): Promise<Subscriber | undefined>;
+  getAllSubscribers(): Promise<Subscriber[]>;
+  getSubscriberCount(): Promise<number>;
+
+  // Social Shares
+  createSocialShare(data: InsertSocialShare): Promise<SocialShare>;
+  getSharesByUser(userId: string): Promise<SocialShare[]>;
+  getShareStats(): Promise<ShareStats[]>;
+
+  // Site Stats
+  getSiteStats(): Promise<SiteStat[]>;
+  upsertSiteStat(key: string, value: string, label: string, icon?: string, sortOrder?: number): Promise<SiteStat>;
+
+  // Analytics
+  getAdminAnalytics(): Promise<AdminAnalytics>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -301,7 +352,7 @@ export class DatabaseStorage implements IStorage {
   async getAllSubmissions(): Promise<SubmissionWithUser[]> {
     const allSubmissions = await db.select().from(submissions);
     const result: SubmissionWithUser[] = [];
-    
+
     for (const sub of allSubmissions) {
       const user = await this.getUser(sub.userId);
       result.push({
@@ -312,16 +363,17 @@ export class DatabaseStorage implements IStorage {
         userCountry: user?.country || null,
       });
     }
-    
+
     return result;
   }
 
+  // @ts-ignore - drizzle dual-module type resolution issue
   async getSubmissionsByCategory(category: Category, status?: SubmissionStatus): Promise<SubmissionWithUser[]> {
     let query = db.select().from(submissions).where(eq(submissions.category, category));
-    const allSubmissions = status 
+    const allSubmissions = status
       ? await db.select().from(submissions).where(and(eq(submissions.category, category), eq(submissions.status, status)))
       : await db.select().from(submissions).where(eq(submissions.category, category));
-    
+
     const result: SubmissionWithUser[] = [];
     for (const sub of allSubmissions) {
       const user = await this.getUser(sub.userId);
@@ -349,8 +401,8 @@ export class DatabaseStorage implements IStorage {
     }
 
     const submissionAnswers = await this.getAnswers(id);
-    const answersWithQuestions: (Answer & { question: Question | CompetitionQuestion })[] = [];
-    
+    const answersWithQuestions: (Answer & { question: any })[] = [];
+
     for (const ans of submissionAnswers) {
       let question: Question | CompetitionQuestion | undefined;
       if (ans.competitionQuestionId) {
@@ -380,10 +432,10 @@ export class DatabaseStorage implements IStorage {
         asc(submissions.answerSeconds),
         asc(submissions.createdAt)
       );
-    
+
     const entries: LeaderboardEntry[] = [];
     let rank = 1;
-    
+
     for (const sub of allSubmissions) {
       const user = await this.getUser(sub.userId);
       if (user) {
@@ -403,7 +455,7 @@ export class DatabaseStorage implements IStorage {
         rank++;
       }
     }
-    
+
     return entries;
   }
 
@@ -416,10 +468,10 @@ export class DatabaseStorage implements IStorage {
         asc(submissions.answerSeconds),
         asc(submissions.createdAt)
       );
-    
+
     const entries: LeaderboardEntry[] = [];
     let rank = 1;
-    
+
     for (const sub of allSubmissions) {
       const user = await this.getUser(sub.userId);
       if (user) {
@@ -439,7 +491,43 @@ export class DatabaseStorage implements IStorage {
         rank++;
       }
     }
-    
+
+    return entries;
+  }
+
+  async getCompetitionAdminLeaderboard(competitionId: string): Promise<LeaderboardEntry[]> {
+    const allSubmissions = await db.select().from(submissions)
+      .where(eq(submissions.competitionId, competitionId))
+      .orderBy(
+        desc(submissions.finalScore),
+        asc(submissions.readingSeconds),
+        asc(submissions.answerSeconds),
+        asc(submissions.createdAt)
+      );
+
+    const entries: LeaderboardEntry[] = [];
+    let rank = 1;
+
+    for (const sub of allSubmissions) {
+      const user = await this.getUser(sub.userId);
+      if (user) {
+        const fullName = `${user.name} ${user.surname}`;
+        entries.push({
+          rank,
+          name: fullName,
+          city: user.city,
+          country: user.country,
+          finalScore: sub.finalScore || 0,
+          readingSpeedWPM: sub.readingSpeedWPM,
+          comprehensionScore: sub.comprehensionScore,
+          readingSeconds: sub.readingSeconds,
+          answerSeconds: sub.answerSeconds,
+          userId: user.id,
+        });
+        rank++;
+      }
+    }
+
     return entries;
   }
 
@@ -448,14 +536,38 @@ export class DatabaseStorage implements IStorage {
     if (!submission) return undefined;
 
     const submissionAnswers = await this.getAnswers(submissionId);
-    
+
+    // Resolve language: detect from actual answered questions > submission.language > user.preferredLanguage > "tr"
+    let submissionLang = (submission as any).language;
+    if (!submissionLang && submissionAnswers.length > 0) {
+      // Detect from the actual questions the student answered
+      for (const ans of submissionAnswers) {
+        if (ans.competitionQuestionId) {
+          const q = await this.getCompetitionQuestion(ans.competitionQuestionId);
+          if (q?.language) {
+            submissionLang = q.language;
+            break;
+          }
+        }
+      }
+    }
+    if (!submissionLang) {
+      const user = await this.getUser(submission.userId);
+      submissionLang = (user as any)?.preferredLanguage;
+      if (!submissionLang && submission.competitionId) {
+        const reg = await this.getRegistration(submission.competitionId, submission.userId);
+        submissionLang = reg?.language;
+      }
+    }
+    submissionLang = submissionLang || "tr";
+
     let allQuestions: any[] = [];
     if (submission.competitionId) {
-      allQuestions = await this.getCompetitionQuestions(submission.competitionId);
+      allQuestions = await this.getCompetitionQuestions(submission.competitionId, submissionLang);
     } else {
       allQuestions = await this.getQuestions(submission.category);
     }
-    
+
     const mcqQuestions = allQuestions.filter(q => q.type === "MCQ");
     const mcqTotalCount = mcqQuestions.length;
     let mcqCorrectCount = 0;
@@ -482,7 +594,7 @@ export class DatabaseStorage implements IStorage {
 
     let bookWordCount = 0;
     if (submission.competitionId) {
-      const book = await this.getCompetitionBook(submission.competitionId);
+      const book = await this.getCompetitionBook(submission.competitionId, submissionLang);
       bookWordCount = book?.wordCount || 0;
     }
 
@@ -527,7 +639,7 @@ export class DatabaseStorage implements IStorage {
   async upsertAnswer(submissionId: string, questionId: string, type: "MCQ" | "TEXT", value: string): Promise<Answer> {
     const [existing] = await db.select().from(answers)
       .where(and(eq(answers.submissionId, submissionId), eq(answers.competitionQuestionId, questionId)));
-    
+
     if (existing) {
       const [updated] = await db.update(answers)
         .set({ value })
@@ -577,10 +689,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async publishResults(category: Category): Promise<CompetitionSettings> {
+    // Also update all competitions in this category so per-competition resultsPublishedAt is set
+    await db.update(competitions)
+      .set({ resultsPublishedAt: new Date() })
+      .where(eq(competitions.category, category));
     return this.upsertCompetitionSettings(category, { resultsPublishedAt: new Date() });
   }
 
   async unpublishResults(category: Category): Promise<CompetitionSettings> {
+    // Also clear per-competition resultsPublishedAt for this category
+    await db.update(competitions)
+      .set({ resultsPublishedAt: null })
+      .where(eq(competitions.category, category));
     const [updated] = await db.update(competitionSettings)
       .set({ resultsPublishedAt: null })
       .where(eq(competitionSettings.category, category))
@@ -598,6 +718,7 @@ export class DatabaseStorage implements IStorage {
     const competition = await this.getCompetition(id);
     if (!competition) return undefined;
 
+    // Get first available book (default language)
     const book = await this.getCompetitionBook(id);
     const questionsResult = await db.select().from(competitionQuestions).where(eq(competitionQuestions.competitionId, id));
     const registrationsResult = await db.select().from(competitionRegistrations).where(eq(competitionRegistrations.competitionId, id));
@@ -668,36 +789,56 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Competition Books
-  async getCompetitionBook(competitionId: string): Promise<CompetitionBook | undefined> {
-    const [book] = await db.select().from(competitionBooks).where(eq(competitionBooks.competitionId, competitionId));
+  async getCompetitionBook(competitionId: string, language?: string): Promise<CompetitionBook | undefined> {
+    const lang = language || "tr";
+    const [book] = await db.select().from(competitionBooks).where(
+      and(eq(competitionBooks.competitionId, competitionId), eq(competitionBooks.language, lang))
+    );
     return book || undefined;
   }
 
-  async upsertCompetitionBook(competitionId: string, data: Partial<InsertCompetitionBook>): Promise<CompetitionBook> {
+  async getCompetitionBooks(competitionId: string): Promise<CompetitionBook[]> {
+    return db.select().from(competitionBooks).where(eq(competitionBooks.competitionId, competitionId));
+  }
+
+  async upsertCompetitionBook(competitionId: string, data: Partial<InsertCompetitionBook>, language?: string): Promise<CompetitionBook> {
+    const lang = language || data.language || "tr";
     if (data.content) {
       data.wordCount = data.content.trim().split(/\s+/).filter(w => w.length > 0).length;
     }
-    const existing = await this.getCompetitionBook(competitionId);
-    if (existing) {
+    data.language = lang;
+    const existing = await this.getCompetitionBook(competitionId, lang);
+    if (existing && existing.language === lang) {
       const [updated] = await db.update(competitionBooks)
         .set(data)
-        .where(eq(competitionBooks.competitionId, competitionId))
+        .where(and(eq(competitionBooks.competitionId, competitionId), eq(competitionBooks.language, lang)))
         .returning();
       return updated;
     } else {
       const [created] = await db.insert(competitionBooks)
-        .values({ ...data, competitionId } as InsertCompetitionBook)
+        .values({ ...data, competitionId, language: lang } as InsertCompetitionBook)
         .returning();
       return created;
     }
   }
 
-  async deleteCompetitionBook(competitionId: string): Promise<void> {
-    await db.delete(competitionBooks).where(eq(competitionBooks.competitionId, competitionId));
+  async deleteCompetitionBook(competitionId: string, language?: string): Promise<void> {
+    if (language) {
+      await db.delete(competitionBooks).where(
+        and(eq(competitionBooks.competitionId, competitionId), eq(competitionBooks.language, language))
+      );
+    } else {
+      await db.delete(competitionBooks).where(eq(competitionBooks.competitionId, competitionId));
+    }
   }
 
   // Competition Questions
-  async getCompetitionQuestions(competitionId: string): Promise<CompetitionQuestion[]> {
+  async getCompetitionQuestions(competitionId: string, language?: string): Promise<CompetitionQuestion[]> {
+    if (language) {
+      return db.select().from(competitionQuestions).where(
+        and(eq(competitionQuestions.competitionId, competitionId), eq(competitionQuestions.language, language))
+      );
+    }
     return db.select().from(competitionQuestions).where(eq(competitionQuestions.competitionId, competitionId));
   }
 
@@ -738,9 +879,10 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(competitionRegistrations).where(eq(competitionRegistrations.competitionId, competitionId));
   }
 
-  async registerForCompetition(competitionId: string, userId: string): Promise<CompetitionRegistration> {
+  async registerForCompetition(competitionId: string, userId: string, language?: string): Promise<CompetitionRegistration> {
+    const lang = language || "tr";
     const [registration] = await db.insert(competitionRegistrations)
-      .values({ competitionId, userId })
+      .values({ competitionId, userId, language: lang })
       .returning();
     return registration;
   }
@@ -843,6 +985,229 @@ export class DatabaseStorage implements IStorage {
     }
 
     return entries;
+  }
+
+  // ─── Testimonials ───────────────────────────────────────────────────────────
+
+  async getPublishedTestimonials(): Promise<Testimonial[]> {
+    return db.select().from(testimonials)
+      .where(eq(testimonials.isPublished, true))
+      .orderBy(asc(testimonials.sortOrder), desc(testimonials.createdAt));
+  }
+
+  async getAllTestimonials(): Promise<Testimonial[]> {
+    return db.select().from(testimonials)
+      .orderBy(asc(testimonials.sortOrder), desc(testimonials.createdAt));
+  }
+
+  async createTestimonial(data: InsertTestimonial): Promise<Testimonial> {
+    const [testimonial] = await db.insert(testimonials).values(data).returning();
+    return testimonial;
+  }
+
+  async updateTestimonial(id: string, data: Partial<InsertTestimonial>): Promise<Testimonial | undefined> {
+    const [updated] = await db.update(testimonials)
+      .set(data)
+      .where(eq(testimonials.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteTestimonial(id: string): Promise<void> {
+    await db.delete(testimonials).where(eq(testimonials.id, id));
+  }
+
+  // ─── Banners ────────────────────────────────────────────────────────────────
+
+  async getActiveBanners(position?: string): Promise<Banner[]> {
+    const now = new Date();
+    if (position) {
+      const results = await db.select().from(banners)
+        .where(and(
+          eq(banners.isActive, true),
+          eq(banners.position, position)
+        ))
+        .orderBy(desc(banners.createdAt));
+      // Filter by date range in JS to handle nullable start/end dates
+      return results.filter(b => {
+        if (b.startDate && b.startDate > now) return false;
+        if (b.endDate && b.endDate < now) return false;
+        return true;
+      });
+    } else {
+      const results = await db.select().from(banners)
+        .where(eq(banners.isActive, true))
+        .orderBy(desc(banners.createdAt));
+      return results.filter(b => {
+        if (b.startDate && b.startDate > now) return false;
+        if (b.endDate && b.endDate < now) return false;
+        return true;
+      });
+    }
+  }
+
+  async getAllBanners(): Promise<Banner[]> {
+    return db.select().from(banners).orderBy(desc(banners.createdAt));
+  }
+
+  async createBanner(data: InsertBanner): Promise<Banner> {
+    const [banner] = await db.insert(banners).values(data).returning();
+    return banner;
+  }
+
+  async updateBanner(id: string, data: Partial<InsertBanner>): Promise<Banner | undefined> {
+    const [updated] = await db.update(banners)
+      .set(data)
+      .where(eq(banners.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteBanner(id: string): Promise<void> {
+    await db.delete(banners).where(eq(banners.id, id));
+  }
+
+  // ─── Subscribers ────────────────────────────────────────────────────────────
+
+  async subscribe(email: string, name?: string, source?: string): Promise<Subscriber> {
+    // Check if already exists
+    const [existing] = await db.select().from(subscribers).where(eq(subscribers.email, email));
+    if (existing) {
+      // Re-activate if previously unsubscribed
+      const [updated] = await db.update(subscribers)
+        .set({ isActive: true, name: name || existing.name, source: source || existing.source, unsubscribedAt: null })
+        .where(eq(subscribers.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(subscribers)
+      .values({ email, name: name || null, source: source || "website" })
+      .returning();
+    return created;
+  }
+
+  async unsubscribe(email: string): Promise<Subscriber | undefined> {
+    const [updated] = await db.update(subscribers)
+      .set({ isActive: false, unsubscribedAt: new Date() })
+      .where(eq(subscribers.email, email))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getAllSubscribers(): Promise<Subscriber[]> {
+    return db.select().from(subscribers).orderBy(desc(subscribers.subscribedAt));
+  }
+
+  async getSubscriberCount(): Promise<number> {
+    const [result] = await db.select({ count: count() }).from(subscribers).where(eq(subscribers.isActive, true));
+    return result?.count || 0;
+  }
+
+  // ─── Social Shares ──────────────────────────────────────────────────────────
+
+  async createSocialShare(data: InsertSocialShare): Promise<SocialShare> {
+    const [share] = await db.insert(socialShares).values(data).returning();
+    return share;
+  }
+
+  async getSharesByUser(userId: string): Promise<SocialShare[]> {
+    return db.select().from(socialShares)
+      .where(eq(socialShares.userId, userId))
+      .orderBy(desc(socialShares.createdAt));
+  }
+
+  async getShareStats(): Promise<ShareStats[]> {
+    const results = await db
+      .select({
+        platform: socialShares.platform,
+        count: count(),
+      })
+      .from(socialShares)
+      .groupBy(socialShares.platform);
+    return results.map(r => ({ platform: r.platform, count: r.count }));
+  }
+
+  // ─── Site Stats ─────────────────────────────────────────────────────────────
+
+  async getSiteStats(): Promise<SiteStat[]> {
+    return db.select().from(siteStats).orderBy(asc(siteStats.sortOrder));
+  }
+
+  async upsertSiteStat(key: string, value: string, label: string, icon?: string, sortOrder?: number): Promise<SiteStat> {
+    const [existing] = await db.select().from(siteStats).where(eq(siteStats.key, key));
+    if (existing) {
+      const updateData: Record<string, any> = { value, label, updatedAt: new Date() };
+      if (icon !== undefined) updateData.icon = icon;
+      if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
+      const [updated] = await db.update(siteStats)
+        .set(updateData)
+        .where(eq(siteStats.key, key))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(siteStats)
+        .values({
+          key,
+          value,
+          label,
+          icon: icon || null,
+          sortOrder: sortOrder || 0,
+        })
+        .returning();
+      return created;
+    }
+  }
+
+  // ─── Analytics ──────────────────────────────────────────────────────────────
+
+  async getAdminAnalytics(): Promise<AdminAnalytics> {
+    // Total users (students only)
+    const [userCount] = await db.select({ count: count() }).from(users).where(eq(users.role, "STUDENT"));
+    const totalUsers = userCount?.count || 0;
+
+    // Total submissions
+    const [subCount] = await db.select({ count: count() }).from(submissions);
+    const totalSubmissions = subCount?.count || 0;
+
+    // Average WPM
+    const [wpmResult] = await db.select({ avg: avg(submissions.readingSpeedWPM) }).from(submissions);
+    const avgWPM = wpmResult?.avg ? Math.round(parseFloat(String(wpmResult.avg)) * 100) / 100 : 0;
+
+    // Registrations by day (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentUsers = await db.select({
+      createdAt: users.createdAt,
+    }).from(users)
+      .where(and(
+        eq(users.role, "STUDENT"),
+        gte(users.createdAt, thirtyDaysAgo)
+      ));
+
+    // Group by date in JS
+    const dayMap = new Map<string, number>();
+    for (const u of recentUsers) {
+      if (u.createdAt) {
+        const dateStr = u.createdAt.toISOString().split("T")[0];
+        dayMap.set(dateStr, (dayMap.get(dateStr) || 0) + 1);
+      }
+    }
+
+    const registrationsByDay: { date: string; count: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split("T")[0];
+      registrationsByDay.push({ date: dateStr, count: dayMap.get(dateStr) || 0 });
+    }
+
+    return {
+      totalUsers,
+      totalSubmissions,
+      avgWPM,
+      registrationsByDay,
+    };
   }
 }
 
