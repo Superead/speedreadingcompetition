@@ -60,6 +60,7 @@ export default function CompetitionReadPage() {
   const [pageHeight, setPageHeight] = useState(0);
 
   const contentRef = useRef<HTMLDivElement>(null);
+  const contentRef2 = useRef<HTMLDivElement>(null); // right page in dual mode
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading, refetch } = useQuery<ReadingData>({
@@ -256,6 +257,7 @@ export default function CompetitionReadPage() {
   }, [recalcPages]);
 
   // Navigate to a specific page
+  const pageStep = dualPage ? 2 : 1;
   const goToPage = useCallback(
     (page: number) => {
       const p = Math.max(1, Math.min(page, totalPages));
@@ -274,16 +276,16 @@ export default function CompetitionReadPage() {
         return;
       if (e.key === "ArrowRight") {
         e.preventDefault();
-        goToPage(currentPage + 1);
+        goToPage(currentPage + pageStep);
       }
       if (e.key === "ArrowLeft") {
         e.preventDefault();
-        goToPage(currentPage - 1);
+        goToPage(currentPage - pageStep);
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [currentPage, goToPage]);
+  }, [currentPage, goToPage, pageStep]);
 
   // ---- Early returns for loading / no-book / pre-start states ----
 
@@ -397,6 +399,33 @@ export default function CompetitionReadPage() {
   const isPdfContent = !data.book.content && data.book.fileUrl;
   const translateY =
     pageHeight > 0 ? -((currentPage - 1) * pageHeight) : 0;
+  // Right page in dual mode shows the next page
+  const translateY2 =
+    pageHeight > 0 ? -(currentPage * pageHeight) : 0;
+
+  const bookContent =
+    data.book.content?.replace(/\n/g, "<br><br>") ||
+    '<p style="text-align:center;color:#888;padding:3rem 0">No content available</p>';
+
+  const contentStyle: React.CSSProperties = {
+    fontFamily: fontFamily,
+    fontSize: `${fontSize}px`,
+    lineHeight: "1.8",
+    textAlign: "justify",
+    paddingTop: `${fontSize * 1.8}px`,
+    paddingBottom: `${fontSize * 1.8}px`,
+    paddingLeft: "3rem",
+    paddingRight: "3rem",
+    WebkitUserSelect: "none",
+    userSelect: "none",
+  };
+
+  const contentHandlers = {
+    onCopy: (e: React.ClipboardEvent) => e.preventDefault(),
+    onCut: (e: React.ClipboardEvent) => e.preventDefault(),
+    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+    onDragStart: (e: React.DragEvent) => e.preventDefault(),
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -535,77 +564,90 @@ export default function CompetitionReadPage() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => goToPage(currentPage - 1)}
+              onClick={() => goToPage(currentPage - pageStep)}
               disabled={currentPage === 1}
               className="shrink-0 h-10 w-10 sm:h-12 sm:w-12"
             >
               <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6" />
             </Button>
 
-            {/* Book page container -- fixed book-like width, centered */}
-            <div
-              className="bg-white dark:bg-card rounded-lg shadow-lg border"
-              ref={containerRef}
-              style={{
-                overflow: "hidden",
-                height: "calc(100vh - 240px)",
-                width: dualPage ? "min(900px, calc(100vw - 120px))" : "min(600px, calc(100vw - 120px))",
-                flexShrink: 0,
-                position: "relative",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-            >
-              {/* Inner clip — snapped to line-height so no partial lines show */}
-              <div style={{
-                overflow: "hidden",
-                height: pageHeight > 0 ? `${pageHeight}px` : "100%",
-                width: "100%",
-              }}>
-                <div
-                  ref={contentRef}
-                  className="select-none"
-                  data-testid="book-content"
+            {dualPage ? (
+              /* ---- Dual page: two side-by-side panels, left=page N, right=page N+1 ---- */
+              <div
+                ref={containerRef}
+                className="flex gap-0 rounded-lg shadow-lg border overflow-hidden"
+                style={{
+                  height: "calc(100vh - 240px)",
+                  width: "min(900px, calc(100vw - 120px))",
+                  flexShrink: 0,
+                }}
+              >
+                {/* Left page */}
+                <div className="flex-1 bg-white dark:bg-card overflow-hidden"
+                  style={{ height: pageHeight > 0 ? `${pageHeight}px` : "100%" }}
+                >
+                  <div
+                    ref={contentRef}
+                    className="select-none"
+                    data-testid="book-content"
+                    style={{ ...contentStyle, transform: `translateY(${translateY}px)`, transition: "transform 0.3s ease" }}
+                    {...contentHandlers}
+                    dangerouslySetInnerHTML={{ __html: bookContent }}
+                  />
+                </div>
+                {/* Center divider */}
+                <div className="w-px bg-border shrink-0" />
+                {/* Right page */}
+                <div className="flex-1 bg-white dark:bg-card overflow-hidden"
                   style={{
-                    transform: `translateY(${translateY}px)`,
-                    transition: "transform 0.3s ease",
-                    fontFamily: fontFamily,
-                    fontSize: `${fontSize}px`,
-                    lineHeight: "1.8",
-                    textAlign: "justify",
-                    // Vertical padding must be a multiple of line-height to keep lines aligned across pages
-                    paddingTop: `${fontSize * 1.8}px`,
-                    paddingBottom: `${fontSize * 1.8}px`,
-                    paddingLeft: dualPage ? "2.5rem" : "3rem",
-                    paddingRight: dualPage ? "2.5rem" : "3rem",
-                    ...(dualPage ? {
-                      columnCount: 2,
-                      columnGap: "48px",
-                      columnRule: "1px solid #e5e7eb",
-                    } : {}),
-                    WebkitUserSelect: "none",
-                    userSelect: "none",
+                    height: pageHeight > 0 ? `${pageHeight}px` : "100%",
+                    visibility: currentPage < totalPages ? "visible" : "hidden",
                   }}
-                  onCopy={(e) => e.preventDefault()}
-                  onCut={(e) => e.preventDefault()}
-                  onContextMenu={(e) => e.preventDefault()}
-                  onDragStart={(e) => e.preventDefault()}
-                  dangerouslySetInnerHTML={{
-                    __html:
-                      data.book.content?.replace(/\n/g, "<br><br>") ||
-                      '<p style="text-align:center;color:#888;padding:3rem 0">No content available</p>',
-                  }}
-                />
+                >
+                  <div
+                    ref={contentRef2}
+                    className="select-none"
+                    style={{ ...contentStyle, transform: `translateY(${translateY2}px)`, transition: "transform 0.3s ease" }}
+                    {...contentHandlers}
+                    dangerouslySetInnerHTML={{ __html: bookContent }}
+                  />
+                </div>
               </div>
-            </div>
+            ) : (
+              /* ---- Single page ---- */
+              <div
+                className="bg-white dark:bg-card rounded-lg shadow-lg border"
+                ref={containerRef}
+                style={{
+                  overflow: "hidden",
+                  height: "calc(100vh - 240px)",
+                  width: "min(600px, calc(100vw - 120px))",
+                  flexShrink: 0,
+                }}
+              >
+                <div style={{
+                  overflow: "hidden",
+                  height: pageHeight > 0 ? `${pageHeight}px` : "100%",
+                  width: "100%",
+                }}>
+                  <div
+                    ref={contentRef}
+                    className="select-none"
+                    data-testid="book-content"
+                    style={{ ...contentStyle, transform: `translateY(${translateY}px)`, transition: "transform 0.3s ease" }}
+                    {...contentHandlers}
+                    dangerouslySetInnerHTML={{ __html: bookContent }}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Right arrow */}
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => goToPage(currentPage + 1)}
-              disabled={currentPage === totalPages}
+              onClick={() => goToPage(currentPage + pageStep)}
+              disabled={currentPage >= totalPages}
               className="shrink-0 h-10 w-10 sm:h-12 sm:w-12"
             >
               <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -614,7 +656,7 @@ export default function CompetitionReadPage() {
 
           {/* Page counter */}
           <div className="text-center text-xs text-muted-foreground py-1 font-medium tabular-nums">
-            {currentPage} / {totalPages}
+            {dualPage ? `${currentPage}-${Math.min(currentPage + 1, totalPages)} / ${totalPages}` : `${currentPage} / ${totalPages}`}
           </div>
         </main>
       )}
