@@ -57,7 +57,7 @@ export default function CompetitionReadPage() {
     () => localStorage.getItem("reader_fontFamily") || "Times New Roman"
   );
   const [dualPage, setDualPage] = useState(false);
-  const [containerWidth, setContainerWidth] = useState(0);
+  const [pageHeight, setPageHeight] = useState(0);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -214,22 +214,29 @@ export default function CompetitionReadPage() {
     localStorage.setItem("reader_fontFamily", fontFamily);
   }, [fontFamily]);
 
-  // Calculate pages after content renders or settings change
+  // Calculate pages using vertical pagination (scrollHeight / visible height)
   const recalcPages = useCallback(() => {
     if (!contentRef.current || !containerRef.current) return;
     const container = containerRef.current;
     const content = contentRef.current;
 
-    // Double rAF to ensure layout is complete
+    // Temporarily reset transform so scrollHeight reflects full content
+    const prevTransform = content.style.transform;
+    const prevTransition = content.style.transition;
+    content.style.transition = "none";
+    content.style.transform = "none";
+
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const cw = container.offsetWidth;
-        if (cw === 0) return;
-        setContainerWidth(cw);
-        const sw = content.scrollWidth;
-        const pages = Math.max(1, Math.ceil(sw / cw));
+        const ch = container.offsetHeight;
+        if (ch === 0) return;
+        setPageHeight(ch);
+        const sh = content.scrollHeight;
+        const pages = Math.max(1, Math.ceil(sh / ch));
         setTotalPages(pages);
         setCurrentPage((prev) => Math.min(prev, pages));
+        // Restore — React will apply the correct transform on next render
+        content.style.transition = prevTransition;
       });
     });
   }, []);
@@ -385,8 +392,8 @@ export default function CompetitionReadPage() {
   );
 
   const isPdfContent = !data.book.content && data.book.fileUrl;
-  const translateX =
-    containerWidth > 0 ? -((currentPage - 1) * containerWidth) : 0;
+  const translateY =
+    pageHeight > 0 ? -((currentPage - 1) * pageHeight) : 0;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -550,7 +557,7 @@ export default function CompetitionReadPage() {
           </div>
 
           {/* Page content with left/right navigation arrows */}
-          <div className="flex items-center gap-1 sm:gap-2 flex-1 min-h-0">
+          <div className="flex items-center justify-center gap-1 sm:gap-2 flex-1 min-h-0">
             {/* Left arrow */}
             <Button
               variant="ghost"
@@ -562,13 +569,15 @@ export default function CompetitionReadPage() {
               <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6" />
             </Button>
 
-            {/* Book page container -- overflow hidden, fixed height */}
+            {/* Book page container -- fixed book-like width, centered */}
             <div
-              className="flex-1 bg-white dark:bg-card rounded-lg shadow-lg min-h-0"
+              className="bg-white dark:bg-card rounded-lg shadow-lg border"
               ref={containerRef}
               style={{
                 overflow: "hidden",
                 height: "calc(100vh - 340px)",
+                width: dualPage ? "min(900px, calc(100vw - 120px))" : "min(600px, calc(100vw - 120px))",
+                flexShrink: 0,
                 position: "relative",
               }}
             >
@@ -577,21 +586,18 @@ export default function CompetitionReadPage() {
                 className="select-none"
                 data-testid="book-content"
                 style={{
-                  columnFill: "auto",
-                  height: "100%",
-                  columnGap: dualPage ? "40px" : "80px",
-                  columnWidth:
-                    containerWidth > 0
-                      ? dualPage
-                        ? `${(containerWidth - 40 - 64) / 2}px`
-                        : `${containerWidth - 64}px`
-                      : undefined,
-                  transform: `translateX(${translateX}px)`,
+                  transform: `translateY(${translateY}px)`,
                   transition: "transform 0.3s ease",
                   fontFamily: fontFamily,
                   fontSize: `${fontSize}px`,
                   lineHeight: "1.8",
-                  padding: "2rem",
+                  textAlign: "justify",
+                  padding: dualPage ? "2rem 2.5rem" : "2rem 3rem",
+                  ...(dualPage ? {
+                    columnCount: 2,
+                    columnGap: "48px",
+                    columnRule: "1px solid #e5e7eb",
+                  } : {}),
                   WebkitUserSelect: "none",
                   userSelect: "none",
                 }}
