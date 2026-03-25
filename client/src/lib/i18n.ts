@@ -19,7 +19,12 @@ i18n.use(initReactI18next).init({
     vi: { translation: vi },
     hi: { translation: hi },
   },
-  lng: localStorage.getItem("i18n_lang") || "tr",
+  lng: localStorage.getItem("i18n_lang") || (() => {
+    // Detect browser language, map to supported languages
+    const supported = ["tr", "en", "de", "pl", "fr", "vi", "hi"];
+    const browserLang = navigator.language?.split("-")[0]?.toLowerCase();
+    return supported.includes(browserLang || "") ? browserLang! : "en";
+  })(),
   fallbackLng: "en",
   interpolation: {
     escapeValue: false,
