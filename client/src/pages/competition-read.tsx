@@ -228,8 +228,11 @@ export default function CompetitionReadPage() {
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const ch = container.offsetHeight;
-        if (ch === 0) return;
+        const rawH = container.offsetHeight;
+        if (rawH === 0) return;
+        // Snap page height to a multiple of line-height so text isn't cut mid-line
+        const lineH = fontSize * 1.8;
+        const ch = Math.floor(rawH / lineH) * lineH;
         setPageHeight(ch);
         const sh = content.scrollHeight;
         const pages = Math.max(1, Math.ceil(sh / ch));
@@ -239,7 +242,7 @@ export default function CompetitionReadPage() {
         content.style.transition = prevTransition;
       });
     });
-  }, []);
+  }, [fontSize]);
 
   useEffect(() => {
     recalcPages();
@@ -466,77 +469,9 @@ export default function CompetitionReadPage() {
         </main>
       ) : (
         /* ---------- Paginated book view ---------- */
-        <main className="flex-1 flex flex-col min-h-0 px-2 sm:px-4 py-2">
-          {/* Toolbar */}
-          <div className="flex items-center justify-center gap-1 sm:gap-2 py-2 border-b bg-card rounded-t-lg px-2 flex-wrap">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => goToPage(1)}
-              disabled={currentPage === 1}
-              className="text-xs sm:text-sm"
-            >
-              First Page
-            </Button>
-
-            <div className="h-5 w-px bg-border mx-1 hidden sm:block" />
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() =>
-                setFontSize((prev) => Math.max(14, prev - 2))
-              }
-              disabled={fontSize <= 14}
-              title="Decrease font size"
-            >
-              <ZoomOut className="h-4 w-4" />
-            </Button>
-            <span className="text-xs text-muted-foreground w-8 text-center tabular-nums">
-              {fontSize}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() =>
-                setFontSize((prev) => Math.min(28, prev + 2))
-              }
-              disabled={fontSize >= 28}
-              title="Increase font size"
-            >
-              <ZoomIn className="h-4 w-4" />
-            </Button>
-
-            <div className="h-5 w-px bg-border mx-1 hidden sm:block" />
-
-            {/* Dual/Single page toggle -- only on wider screens */}
-            <Button
-              variant={dualPage ? "default" : "ghost"}
-              size="icon"
-              className="h-8 w-8 hidden md:flex"
-              onClick={() => setDualPage((prev) => !prev)}
-              title={dualPage ? "Single page view" : "Dual page view"}
-            >
-              <Columns className="h-4 w-4" />
-            </Button>
-
-            <div className="h-5 w-px bg-border mx-1 hidden md:block" />
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => goToPage(totalPages)}
-              disabled={currentPage === totalPages}
-              className="text-xs sm:text-sm"
-            >
-              Last Page
-            </Button>
-          </div>
-
-          {/* Font selector row */}
-          <div className="flex items-center justify-center gap-1.5 py-1.5 bg-card border-b px-2">
+        <main className="flex-1 flex flex-col min-h-0 px-2 sm:px-4 py-1">
+          {/* Toolbar — single row with page nav, font, zoom, dual toggle */}
+          <div className="flex items-center justify-center gap-1 sm:gap-2 py-1.5 border-b bg-card rounded-t-lg px-2 flex-wrap">
             {FONT_OPTIONS.map((f) => (
               <Button
                 key={f.name}
@@ -549,11 +484,49 @@ export default function CompetitionReadPage() {
                 {f.label}
               </Button>
             ))}
-          </div>
 
-          {/* Book title */}
-          <div className="text-center text-sm text-muted-foreground py-1.5">
-            {data.book.title}
+            <div className="h-5 w-px bg-border mx-1" />
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() =>
+                setFontSize((prev) => Math.max(14, prev - 2))
+              }
+              disabled={fontSize <= 14}
+              title="Decrease font size"
+            >
+              <ZoomOut className="h-3.5 w-3.5" />
+            </Button>
+            <span className="text-xs text-muted-foreground w-6 text-center tabular-nums">
+              {fontSize}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() =>
+                setFontSize((prev) => Math.min(28, prev + 2))
+              }
+              disabled={fontSize >= 28}
+              title="Increase font size"
+            >
+              <ZoomIn className="h-3.5 w-3.5" />
+            </Button>
+
+            <div className="h-5 w-px bg-border mx-1 hidden md:block" />
+
+            {/* Dual/Single page toggle -- only on wider screens */}
+            <Button
+              variant={dualPage ? "default" : "ghost"}
+              size="icon"
+              className="h-7 w-7 hidden md:flex"
+              onClick={() => setDualPage((prev) => !prev)}
+              title={dualPage ? "Single page view" : "Dual page view"}
+            >
+              <Columns className="h-3.5 w-3.5" />
+            </Button>
           </div>
 
           {/* Page content with left/right navigation arrows */}
@@ -575,42 +548,56 @@ export default function CompetitionReadPage() {
               ref={containerRef}
               style={{
                 overflow: "hidden",
-                height: "calc(100vh - 340px)",
+                height: "calc(100vh - 240px)",
                 width: dualPage ? "min(900px, calc(100vw - 120px))" : "min(600px, calc(100vw - 120px))",
                 flexShrink: 0,
                 position: "relative",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
               }}
             >
-              <div
-                ref={contentRef}
-                className="select-none"
-                data-testid="book-content"
-                style={{
-                  transform: `translateY(${translateY}px)`,
-                  transition: "transform 0.3s ease",
-                  fontFamily: fontFamily,
-                  fontSize: `${fontSize}px`,
-                  lineHeight: "1.8",
-                  textAlign: "justify",
-                  padding: dualPage ? "2rem 2.5rem" : "2rem 3rem",
-                  ...(dualPage ? {
-                    columnCount: 2,
-                    columnGap: "48px",
-                    columnRule: "1px solid #e5e7eb",
-                  } : {}),
-                  WebkitUserSelect: "none",
-                  userSelect: "none",
-                }}
-                onCopy={(e) => e.preventDefault()}
-                onCut={(e) => e.preventDefault()}
-                onContextMenu={(e) => e.preventDefault()}
-                onDragStart={(e) => e.preventDefault()}
-                dangerouslySetInnerHTML={{
-                  __html:
-                    data.book.content?.replace(/\n/g, "<br><br>") ||
-                    '<p style="text-align:center;color:#888;padding:3rem 0">No content available</p>',
-                }}
-              />
+              {/* Inner clip — snapped to line-height so no partial lines show */}
+              <div style={{
+                overflow: "hidden",
+                height: pageHeight > 0 ? `${pageHeight}px` : "100%",
+                width: "100%",
+              }}>
+                <div
+                  ref={contentRef}
+                  className="select-none"
+                  data-testid="book-content"
+                  style={{
+                    transform: `translateY(${translateY}px)`,
+                    transition: "transform 0.3s ease",
+                    fontFamily: fontFamily,
+                    fontSize: `${fontSize}px`,
+                    lineHeight: "1.8",
+                    textAlign: "justify",
+                    // Vertical padding must be a multiple of line-height to keep lines aligned across pages
+                    paddingTop: `${fontSize * 1.8}px`,
+                    paddingBottom: `${fontSize * 1.8}px`,
+                    paddingLeft: dualPage ? "2.5rem" : "3rem",
+                    paddingRight: dualPage ? "2.5rem" : "3rem",
+                    ...(dualPage ? {
+                      columnCount: 2,
+                      columnGap: "48px",
+                      columnRule: "1px solid #e5e7eb",
+                    } : {}),
+                    WebkitUserSelect: "none",
+                    userSelect: "none",
+                  }}
+                  onCopy={(e) => e.preventDefault()}
+                  onCut={(e) => e.preventDefault()}
+                  onContextMenu={(e) => e.preventDefault()}
+                  onDragStart={(e) => e.preventDefault()}
+                  dangerouslySetInnerHTML={{
+                    __html:
+                      data.book.content?.replace(/\n/g, "<br><br>") ||
+                      '<p style="text-align:center;color:#888;padding:3rem 0">No content available</p>',
+                  }}
+                />
+              </div>
             </div>
 
             {/* Right arrow */}
@@ -626,14 +613,14 @@ export default function CompetitionReadPage() {
           </div>
 
           {/* Page counter */}
-          <div className="text-center text-sm text-muted-foreground py-2 font-medium tabular-nums">
+          <div className="text-center text-xs text-muted-foreground py-1 font-medium tabular-nums">
             {currentPage} / {totalPages}
           </div>
         </main>
       )}
 
       {/* Sticky footer with finish button */}
-      <footer className="sticky bottom-0 border-t bg-card py-4">
+      <footer className="sticky bottom-0 border-t bg-card py-2">
         <div className="container mx-auto px-4 flex justify-center">
           <Button
             size="lg"
