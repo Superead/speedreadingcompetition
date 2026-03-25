@@ -41,8 +41,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(newUser);
     localStorage.setItem("token", newToken);
     localStorage.setItem("user", JSON.stringify(newUser));
-    // Only set UI language on first login (when no explicit UI language choice exists yet)
-    if (!localStorage.getItem("i18n_lang") && (newUser as any).preferredLanguage) {
+    // Set UI language to user's preferred language on login
+    if ((newUser as any).preferredLanguage) {
       changeLanguage((newUser as any).preferredLanguage);
     }
   };
@@ -55,8 +55,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("i18n_lang");
     // Clear all cached queries so next user doesn't see stale data
     queryClient.clear();
-    // Reset UI language to Turkish (default)
-    changeLanguage("tr");
+    // Reset UI language to browser default (not hardcoded Turkish)
+    const supported = ["tr", "en", "de", "pl", "fr", "vi", "hi"];
+    const browserLang = navigator.language?.split("-")[0]?.toLowerCase();
+    changeLanguage(supported.includes(browserLang || "") ? browserLang! : "en");
   };
 
   const isAdmin = user?.role === "ADMIN";
