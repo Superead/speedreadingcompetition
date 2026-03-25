@@ -1,18 +1,19 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DurationTimer } from "@/components/countdown-timer";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Clock, BookOpen, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
+import {
+  Clock, BookOpen, CheckCircle, AlertTriangle, Loader2,
+  ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Columns,
+} from "lucide-react";
 import type { Book, Submission, CompetitionSettings } from "@shared/schema";
-import { useTranslation } from "react-i18next";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,15 +31,36 @@ interface ReadingData {
   settings: CompetitionSettings | null;
 }
 
+const FONT_OPTIONS = [
+  { name: "Times New Roman", label: "Times" },
+  { name: "Georgia", label: "Georgia" },
+  { name: "'Garamond', serif", label: "Garamond" },
+  { name: "'Open Sans', sans-serif", label: "Sans" },
+];
+
 export default function CompetitionReadPage() {
   const { token } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { t } = useTranslation();
   const [showFinishDialog, setShowFinishDialog] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [autoFinishing, setAutoFinishing] = useState(false);
   const finishingRef = useRef(false);
+
+  // Book pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [fontSize, setFontSize] = useState(() =>
+    parseInt(localStorage.getItem("reader_fontSize") || "18")
+  );
+  const [fontFamily, setFontFamily] = useState(
+    () => localStorage.getItem("reader_fontFamily") || "Times New Roman"
+  );
+  const [dualPage, setDualPage] = useState(false);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  const contentRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading, refetch } = useQuery<ReadingData>({
     queryKey: ["/api/student/reading"],
@@ -54,8 +76,8 @@ export default function CompetitionReadPage() {
       setHasStarted(true);
       refetch();
       toast({
-        title: t('reading.started'),
-        description: t('reading.timerBegun'),
+        title: "Reading started!",
+        description: "Your timer has begun. Good luck!",
       });
     },
     onError: (error: Error) => {
@@ -75,8 +97,8 @@ export default function CompetitionReadPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/student/dashboard"] });
       toast({
-        title: t('reading.completed'),
-        description: t('reading.nowAnswer'),
+        title: "Reading completed!",
+        description: "Now answer the questions.",
       });
       navigate("/competition/questions");
     },
@@ -91,17 +113,20 @@ export default function CompetitionReadPage() {
     },
   });
 
-  const isReadingActive = data?.submission?.readingStartAt && !data?.submission?.readingEndAt;
+  const isReadingActive =
+    data?.submission?.readingStartAt && !data?.submission?.readingEndAt;
   const hasFinishedReading = data?.submission?.readingEndAt != null;
   const hasCompletedCompetition = data?.submission?.answerEndAt != null;
 
-  // Block copy shortcuts (Ctrl+C, Ctrl+A, Ctrl+U) on reading page
+  // Block copy shortcuts (Ctrl+C, Ctrl+A, Ctrl+U, Ctrl+S) and PrintScreen
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && ["c", "a", "u", "s"].includes(e.key.toLowerCase())) {
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        ["c", "a", "u", "s"].includes(e.key.toLowerCase())
+      ) {
         e.preventDefault();
       }
-      // Block PrintScreen
       if (e.key === "PrintScreen") {
         e.preventDefault();
       }
@@ -114,7 +139,8 @@ export default function CompetitionReadPage() {
     if (hasCompletedCompetition) {
       toast({
         title: "Competition already completed",
-        description: "You have already finished this competition. Results will be announced soon.",
+        description:
+          "You have already finished this competition. Results will be announced soon.",
       });
       navigate("/dashboard");
       return;
@@ -124,18 +150,18 @@ export default function CompetitionReadPage() {
     }
   }, [hasFinishedReading, hasCompletedCompetition, navigate]);
 
-  // Auto-finish reading ONLY if reading was actively started before competition ended
+  // Auto-finish reading when competition ends
   useEffect(() => {
-    if (!isReadingActive || !data?.settings?.competitionEndTime || autoFinishing || hasFinishedReading) return;
-    // Only auto-finish if reading was started BEFORE the competition ended
-    if (!data?.submission?.readingStartAt) return;
+    if (
+      !isReadingActive ||
+      !data?.settings?.competitionEndTime ||
+      autoFinishing ||
+      hasFinishedReading
+    )
+      return;
 
     const competitionEnd = new Date(data.settings.competitionEndTime);
-    const readingStarted = new Date(data.submission.readingStartAt);
     const now = new Date();
-
-    // If reading was started after competition ended (shouldn't happen but safety check), don't auto-finish
-    if (readingStarted > competitionEnd) return;
 
     const triggerAutoFinish = () => {
       if (finishingRef.current || autoFinishing) return;
@@ -159,7 +185,12 @@ export default function CompetitionReadPage() {
       const timeout = setTimeout(triggerAutoFinish, timeUntilEnd);
       return () => clearTimeout(timeout);
     }
-  }, [isReadingActive, data?.settings?.competitionEndTime, autoFinishing, hasFinishedReading]);
+  }, [
+    isReadingActive,
+    data?.settings?.competitionEndTime,
+    autoFinishing,
+    hasFinishedReading,
+  ]);
 
   const handleTimeUp = () => {
     if (isReadingActive && !finishingRef.current) {
@@ -173,6 +204,78 @@ export default function CompetitionReadPage() {
       finishReadingMutation.mutate();
     }
   };
+
+  // Persist font settings to localStorage
+  useEffect(() => {
+    localStorage.setItem("reader_fontSize", String(fontSize));
+  }, [fontSize]);
+
+  useEffect(() => {
+    localStorage.setItem("reader_fontFamily", fontFamily);
+  }, [fontFamily]);
+
+  // Calculate pages after content renders or settings change
+  const recalcPages = useCallback(() => {
+    if (!contentRef.current || !containerRef.current) return;
+    const container = containerRef.current;
+    const content = contentRef.current;
+
+    // Double rAF to ensure layout is complete
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const cw = container.offsetWidth;
+        if (cw === 0) return;
+        setContainerWidth(cw);
+        const sw = content.scrollWidth;
+        const pages = Math.max(1, Math.ceil(sw / cw));
+        setTotalPages(pages);
+        setCurrentPage((prev) => Math.min(prev, pages));
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    recalcPages();
+  }, [data?.book?.content, fontSize, fontFamily, dualPage, recalcPages]);
+
+  // Recalculate on window resize
+  useEffect(() => {
+    const handleResize = () => recalcPages();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [recalcPages]);
+
+  // Navigate to a specific page
+  const goToPage = useCallback(
+    (page: number) => {
+      const p = Math.max(1, Math.min(page, totalPages));
+      setCurrentPage(p);
+    },
+    [totalPages]
+  );
+
+  // Keyboard navigation (Left/Right arrow keys)
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      )
+        return;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        goToPage(currentPage + 1);
+      }
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        goToPage(currentPage - 1);
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [currentPage, goToPage]);
+
+  // ---- Early returns for loading / no-book / pre-start states ----
 
   if (isLoading) {
     return (
@@ -193,12 +296,12 @@ export default function CompetitionReadPage() {
         <Card className="max-w-md w-full">
           <CardContent className="pt-6 text-center space-y-4">
             <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto" />
-            <h2 className="text-xl font-semibold">{t('reading.noBook')}</h2>
+            <h2 className="text-xl font-semibold">No Book Available</h2>
             <p className="text-muted-foreground">
-              {t('reading.noBookDesc')}
+              The book for this competition has not been uploaded yet.
             </p>
             <Button onClick={() => navigate("/dashboard")}>
-              {t('common.backToDashboard')}
+              Back to Dashboard
             </Button>
           </CardContent>
         </Card>
@@ -217,25 +320,31 @@ export default function CompetitionReadPage() {
               </div>
               <h2 className="text-2xl font-bold">{data.book.title}</h2>
               <p className="text-muted-foreground">
-                {t('reading.youHaveMinutes', { minutes: data.settings?.readingDurationMinutes || 30 })}
+                You have{" "}
+                <span className="font-semibold text-foreground">
+                  {data.settings?.readingDurationMinutes || 30} minutes
+                </span>{" "}
+                to read.
               </p>
             </div>
 
             <div className="bg-muted/50 rounded-lg p-4 space-y-2">
               <h3 className="font-semibold flex items-center gap-2">
                 <Clock className="h-4 w-4" />
-                {t('reading.instructions')}
+                Instructions
               </h3>
               <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• {t('reading.instruction1')}</li>
-                <li>• {t('reading.instruction2')}</li>
-                <li>• {t('reading.instruction3')}</li>
-                <li>• {t('reading.instruction4')}</li>
+                <li>• Your timer starts when you click "Start Reading"</li>
+                <li>
+                  • Read carefully as you'll answer questions afterwards
+                </li>
+                <li>• Click "Finish Reading" when done</li>
+                <li>• Timer auto-submits when time runs out</li>
               </ul>
             </div>
 
-            <Button 
-              className="w-full" 
+            <Button
+              className="w-full"
               size="lg"
               onClick={() => startReadingMutation.mutate()}
               disabled={startReadingMutation.isPending}
@@ -244,10 +353,10 @@ export default function CompetitionReadPage() {
               {startReadingMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t('reading.starting')}
+                  Starting...
                 </>
               ) : (
-                t('reading.startReading')
+                "Start Reading"
               )}
             </Button>
           </CardContent>
@@ -256,24 +365,45 @@ export default function CompetitionReadPage() {
     );
   }
 
-  const readingStart = data.submission?.readingStartAt ? new Date(data.submission.readingStartAt) : new Date();
+  // ---- Active reading view ----
+
+  const readingStart = data.submission?.readingStartAt
+    ? new Date(data.submission.readingStartAt)
+    : new Date();
   const durationMinutes = data.settings?.readingDurationMinutes || 30;
-  const endTime = new Date(readingStart.getTime() + durationMinutes * 60 * 1000);
-  const progress = Math.max(0, Math.min(100, ((Date.now() - readingStart.getTime()) / (durationMinutes * 60 * 1000)) * 100));
+  const endTime = new Date(
+    readingStart.getTime() + durationMinutes * 60 * 1000
+  );
+  const progress = Math.max(
+    0,
+    Math.min(
+      100,
+      ((Date.now() - readingStart.getTime()) /
+        (durationMinutes * 60 * 1000)) *
+        100
+    )
+  );
+
+  const isPdfContent = !data.book.content && data.book.fileUrl;
+  const translateX =
+    containerWidth > 0 ? -((currentPage - 1) * containerWidth) : 0;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      {/* Sticky header with timer */}
       <header className="sticky top-0 z-50 border-b bg-card">
         <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between gap-2 sm:gap-4">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <BookOpen className="h-5 w-5 text-primary shrink-0" />
-              <span className="font-semibold hidden sm:inline truncate">{data.book.title}</span>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <BookOpen className="h-5 w-5 text-primary" />
+              <span className="font-semibold hidden sm:inline">
+                {data.book.title}
+              </span>
             </div>
-            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-              <div className="flex items-center gap-1.5 sm:gap-2 text-sm">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-sm">
                 <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground hidden sm:inline">{t('reading.timeRemaining')}:</span>
+                <span className="text-muted-foreground">Time remaining:</span>
                 <DurationTimer
                   startTime={readingStart}
                   durationMinutes={durationMinutes}
@@ -287,68 +417,242 @@ export default function CompetitionReadPage() {
         </div>
       </header>
 
-      <main className="flex-1 container mx-auto px-3 sm:px-4 py-4 sm:py-8">
-        <Card className="max-w-4xl mx-auto">
-          <CardContent className="p-4 sm:p-6 md:p-8">
-            <ScrollArea className="h-[calc(100vh-220px)] sm:h-[60vh]">
+      {isPdfContent ? (
+        /* ---------- PDF viewer (unchanged) ---------- */
+        <main className="flex-1 container mx-auto px-4 py-8">
+          <Card className="max-w-4xl mx-auto">
+            <CardContent className="p-8">
               <div
-                className="prose prose-lg dark:prose-invert max-w-none select-none"
+                className="prose prose-lg dark:prose-invert max-w-none"
                 data-testid="book-content"
-                style={{ WebkitUserSelect: "none", userSelect: "none" }}
+              >
+                <div className="w-full">
+                  <object
+                    data={data.book.fileUrl!}
+                    type="application/pdf"
+                    className="w-full"
+                    style={{ height: "58vh" }}
+                  >
+                    <iframe
+                      src={`${data.book.fileUrl}#toolbar=0`}
+                      className="w-full border-0"
+                      style={{ height: "58vh" }}
+                      title="Reading material"
+                    >
+                      <p className="text-muted-foreground text-sm text-center py-4">
+                        Your browser cannot display the PDF inline.{" "}
+                        <a
+                          href={data.book.fileUrl!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary underline"
+                        >
+                          Open PDF in new tab
+                        </a>
+                      </p>
+                    </iframe>
+                  </object>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
+      ) : (
+        /* ---------- Paginated book view ---------- */
+        <main className="flex-1 flex flex-col min-h-0 px-2 sm:px-4 py-2">
+          {/* Toolbar */}
+          <div className="flex items-center justify-center gap-1 sm:gap-2 py-2 border-b bg-card rounded-t-lg px-2 flex-wrap">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => goToPage(1)}
+              disabled={currentPage === 1}
+              className="text-xs sm:text-sm"
+            >
+              First Page
+            </Button>
+
+            <div className="h-5 w-px bg-border mx-1 hidden sm:block" />
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() =>
+                setFontSize((prev) => Math.max(14, prev - 2))
+              }
+              disabled={fontSize <= 14}
+              title="Decrease font size"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <span className="text-xs text-muted-foreground w-8 text-center tabular-nums">
+              {fontSize}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() =>
+                setFontSize((prev) => Math.min(28, prev + 2))
+              }
+              disabled={fontSize >= 28}
+              title="Increase font size"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+
+            <div className="h-5 w-px bg-border mx-1 hidden sm:block" />
+
+            {/* Dual/Single page toggle -- only on wider screens */}
+            <Button
+              variant={dualPage ? "default" : "ghost"}
+              size="icon"
+              className="h-8 w-8 hidden md:flex"
+              onClick={() => setDualPage((prev) => !prev)}
+              title={dualPage ? "Single page view" : "Dual page view"}
+            >
+              <Columns className="h-4 w-4" />
+            </Button>
+
+            <div className="h-5 w-px bg-border mx-1 hidden md:block" />
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => goToPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="text-xs sm:text-sm"
+            >
+              Last Page
+            </Button>
+          </div>
+
+          {/* Font selector row */}
+          <div className="flex items-center justify-center gap-1.5 py-1.5 bg-card border-b px-2">
+            {FONT_OPTIONS.map((f) => (
+              <Button
+                key={f.name}
+                variant={fontFamily === f.name ? "default" : "outline"}
+                size="sm"
+                className="text-xs h-7 px-2"
+                onClick={() => setFontFamily(f.name)}
+                style={{ fontFamily: f.name }}
+              >
+                {f.label}
+              </Button>
+            ))}
+          </div>
+
+          {/* Book title */}
+          <div className="text-center text-sm text-muted-foreground py-1.5">
+            {data.book.title}
+          </div>
+
+          {/* Page content with left/right navigation arrows */}
+          <div className="flex items-center gap-1 sm:gap-2 flex-1 min-h-0">
+            {/* Left arrow */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => goToPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="shrink-0 h-10 w-10 sm:h-12 sm:w-12"
+            >
+              <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6" />
+            </Button>
+
+            {/* Book page container -- overflow hidden, fixed height */}
+            <div
+              className="flex-1 bg-white dark:bg-card rounded-lg shadow-lg min-h-0"
+              ref={containerRef}
+              style={{
+                overflow: "hidden",
+                height: "calc(100vh - 340px)",
+                position: "relative",
+              }}
+            >
+              <div
+                ref={contentRef}
+                className="select-none"
+                data-testid="book-content"
+                style={{
+                  columnFill: "auto",
+                  height: "100%",
+                  columnGap: dualPage ? "40px" : "80px",
+                  columnWidth:
+                    containerWidth > 0
+                      ? dualPage
+                        ? `${(containerWidth - 40 - 64) / 2}px`
+                        : `${containerWidth - 64}px`
+                      : undefined,
+                  transform: `translateX(${translateX}px)`,
+                  transition: "transform 0.3s ease",
+                  fontFamily: fontFamily,
+                  fontSize: `${fontSize}px`,
+                  lineHeight: "1.8",
+                  padding: "2rem",
+                  WebkitUserSelect: "none",
+                  userSelect: "none",
+                }}
                 onCopy={(e) => e.preventDefault()}
                 onCut={(e) => e.preventDefault()}
                 onContextMenu={(e) => e.preventDefault()}
                 onDragStart={(e) => e.preventDefault()}
-              >
-                {data.book.content ? (
-                  <div dangerouslySetInnerHTML={{ __html: data.book.content.replace(/\n/g, '<br><br>') }} />
-                ) : data.book.fileUrl ? (
-                  <div className="text-center py-12">
-                    <p className="text-muted-foreground mb-4">PDF viewer placeholder</p>
-                    <a 
-                      href={data.book.fileUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-primary underline"
-                    >
-                      Open PDF in new tab
-                    </a>
-                  </div>
-                ) : (
-                  <p className="text-center text-muted-foreground py-12">
-                    No content available
-                  </p>
-                )}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      </main>
+                dangerouslySetInnerHTML={{
+                  __html:
+                    data.book.content?.replace(/\n/g, "<br><br>") ||
+                    '<p style="text-align:center;color:#888;padding:3rem 0">No content available</p>',
+                }}
+              />
+            </div>
 
+            {/* Right arrow */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => goToPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="shrink-0 h-10 w-10 sm:h-12 sm:w-12"
+            >
+              <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
+            </Button>
+          </div>
+
+          {/* Page counter */}
+          <div className="text-center text-sm text-muted-foreground py-2 font-medium tabular-nums">
+            {currentPage} / {totalPages}
+          </div>
+        </main>
+      )}
+
+      {/* Sticky footer with finish button */}
       <footer className="sticky bottom-0 border-t bg-card py-4">
         <div className="container mx-auto px-4 flex justify-center">
-          <Button 
-            size="lg" 
+          <Button
+            size="lg"
             onClick={() => setShowFinishDialog(true)}
             className="gap-2"
             data-testid="button-finish-reading"
           >
             <CheckCircle className="h-5 w-5" />
-            {t('reading.finishReading')}
+            Finish Reading
           </Button>
         </div>
       </footer>
 
+      {/* Finish reading confirmation dialog */}
       <AlertDialog open={showFinishDialog} onOpenChange={setShowFinishDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('reading.finishReadingTitle')}</AlertDialogTitle>
+            <AlertDialogTitle>Finish Reading?</AlertDialogTitle>
             <AlertDialogDescription>
-              {t('reading.finishReadingDesc')}
+              Are you sure you want to finish reading? You won't be able to
+              come back to the book. You will proceed to the questions section.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t('reading.keepReading')}</AlertDialogCancel>
+            <AlertDialogCancel>Keep Reading</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (finishingRef.current) return;
@@ -361,10 +665,10 @@ export default function CompetitionReadPage() {
               {finishReadingMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t('reading.finishing')}
+                  Finishing...
                 </>
               ) : (
-                t('reading.yesFinish')
+                "Yes, Finish"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
