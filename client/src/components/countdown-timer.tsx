@@ -45,12 +45,14 @@ export function CountdownTimer({
     if (!targetDate) return;
 
     const target = typeof targetDate === "string" ? new Date(targetDate) : targetDate;
-    
+    let completed = false;
+
     const updateTimer = () => {
       const newTimeLeft = calculateTimeLeft(target);
       setTimeLeft(newTimeLeft);
-      
-      if (newTimeLeft.total <= 0 && onComplete) {
+
+      if (newTimeLeft.total <= 0 && onComplete && !completed) {
+        completed = true;
         onComplete();
       }
     };

@@ -285,6 +285,10 @@
     "answerReview": "Xem lại câu trả lời",
     "leaderboard": "Bảng xếp hạng",
     "questionsAnswered": "câu hỏi đã trả lời",
-    "yourAnswer": "Câu trả lời của bạn"
+    "yourAnswer": "Câu trả lời của bạn",
+    "accuracy": "Độ chính xác",
+    "speedLabel": "Tốc độ",
+    "comprehensionLabel": "Hiểu bài",
+    "finalScoreFormula": "Điểm cuối = Điểm hiểu bài x Tốc độ đọc (WPM)"
   }
 }

@@ -285,6 +285,10 @@
     "answerReview": "उत्तर समीक्षा",
     "leaderboard": "लीडरबोर्ड",
     "questionsAnswered": "प्रश्नों के उत्तर दिए",
-    "yourAnswer": "आपका उत्तर"
+    "yourAnswer": "आपका उत्तर",
+    "accuracy": "सटीकता",
+    "speedLabel": "गति",
+    "comprehensionLabel": "समझ",
+    "finalScoreFormula": "अंतिम स्कोर = समझ स्कोर x पढ़ने की गति (WPM)"
   }
 }

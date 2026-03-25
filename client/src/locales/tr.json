@@ -286,6 +286,10 @@
     "answerReview": "Cevap İncelemesi",
     "leaderboard": "Sıralama",
     "questionsAnswered": "soru cevaplandı",
-    "yourAnswer": "Cevabınız"
+    "yourAnswer": "Cevabınız",
+    "accuracy": "Doğruluk",
+    "speedLabel": "Hız",
+    "comprehensionLabel": "Anlama",
+    "finalScoreFormula": "Final Skor = Anlama Puanı x Okuma Hızı (DPM)"
   }
 }

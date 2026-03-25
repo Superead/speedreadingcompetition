@@ -277,20 +277,20 @@ export default function CompetitionResultsPage() {
               <ScoreRing
                 value={submission.mcqCorrectCount || 0}
                 max={submission.mcqTotalCount || 1}
-                label="Accuracy"
+                label={t('results.accuracy')}
                 color="text-green-500"
               />
               <ScoreRing
                 value={Math.min(submission.readingSpeedWPM || 0, 500)}
                 max={500}
-                label="Speed"
+                label={t('results.speedLabel')}
                 color="text-blue-500"
               />
               {submission.comprehensionScore != null && (
                 <ScoreRing
                   value={submission.comprehensionScore}
                   max={10}
-                  label="Comprehension"
+                  label={t('results.comprehensionLabel')}
                   color="text-purple-500"
                 />
               )}
@@ -299,7 +299,7 @@ export default function CompetitionResultsPage() {
               <div className="mt-6 text-center">
                 <Separator className="mb-4" />
                 <p className="text-sm text-muted-foreground">
-                  Final Score = Comprehension Score x Reading Speed (WPM)
+                  {t('results.finalScoreFormula')}
                 </p>
                 <p className="text-xl font-bold text-primary mt-1">
                   {submission.comprehensionScore?.toFixed(1)} x {Math.round(submission.readingSpeedWPM || 0)} = {Math.round(submission.finalScore).toLocaleString()}

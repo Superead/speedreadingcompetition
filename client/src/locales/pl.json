@@ -285,6 +285,10 @@
     "answerReview": "Przegląd odpowiedzi",
     "leaderboard": "Ranking",
     "questionsAnswered": "pytań odpowiedzianych",
-    "yourAnswer": "Twoja odpowiedź"
+    "yourAnswer": "Twoja odpowiedź",
+    "accuracy": "Dokładność",
+    "speedLabel": "Szybkość",
+    "comprehensionLabel": "Zrozumienie",
+    "finalScoreFormula": "Wynik końcowy = Wynik zrozumienia x Szybkość czytania (WPM)"
   }
 }

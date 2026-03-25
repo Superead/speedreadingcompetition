@@ -286,6 +286,10 @@
     "answerReview": "Answer Review",
     "leaderboard": "Leaderboard",
     "questionsAnswered": "questions answered",
-    "yourAnswer": "Your answer"
+    "yourAnswer": "Your answer",
+    "accuracy": "Accuracy",
+    "speedLabel": "Speed",
+    "comprehensionLabel": "Comprehension",
+    "finalScoreFormula": "Final Score = Comprehension Score x Reading Speed (WPM)"
   }
 }

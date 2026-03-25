@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -174,6 +175,13 @@ export default function DashboardPage() {
     changeLanguage(lang);
     languageMutation.mutate(lang);
   };
+
+  // Force re-render when countdown reaches 0 so start button appears automatically
+  const [, setCompetitionStarted] = useState(false);
+  const onCountdownComplete = useCallback(() => {
+    setCompetitionStarted(true);
+    queryClient.invalidateQueries({ queryKey: ["/api/student/dashboard"] });
+  }, []);
 
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/student/dashboard"],
@@ -487,7 +495,7 @@ export default function DashboardPage() {
                     {new Date() < new Date(data.settings.competitionStartTime) ? (
                       <div className="text-center">
                         <p className="text-sm text-muted-foreground mb-2">{t('dashboard.competitionStartsIn')}</p>
-                        <CountdownTimer targetDate={data.settings.competitionStartTime} size="lg" className="justify-center" />
+                        <CountdownTimer targetDate={data.settings.competitionStartTime} size="lg" className="justify-center" onComplete={onCountdownComplete} />
                       </div>
                     ) : (
                       <div className="text-center py-2">

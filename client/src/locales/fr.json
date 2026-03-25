@@ -285,6 +285,10 @@
     "answerReview": "Revue des réponses",
     "leaderboard": "Classement",
     "questionsAnswered": "questions répondues",
-    "yourAnswer": "Votre réponse"
+    "yourAnswer": "Votre réponse",
+    "accuracy": "Précision",
+    "speedLabel": "Vitesse",
+    "comprehensionLabel": "Compréhension",
+    "finalScoreFormula": "Score final = Score de compréhension x Vitesse de lecture (MPM)"
   }
 }
