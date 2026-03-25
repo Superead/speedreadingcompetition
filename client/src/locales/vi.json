@@ -120,6 +120,8 @@
     "phone": "Số điện thoại",
     "city": "Thành phố",
     "country": "Quốc gia",
+    "selectCountry": "Chọn quốc gia của bạn",
+    "cityPlaceholder": "Nhập thành phố của bạn",
     "referralCode": "Mã giới thiệu (tùy chọn)",
     "referralHint": "Nhập mã của bạn bè để tặng họ điểm",
     "competitionLanguage": "Ngôn ngữ thi",

@@ -11,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
+import { COUNTRIES } from "@/lib/countries";
 import { ArrowLeft, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -74,8 +75,8 @@ const registerFormSchema = z.object({
   gender: z.enum(["male", "female", "other"]).optional(),
   birthdate: z.string().min(1, "Date of birth is required"),
   phone: z.string().optional(),
-  city: z.string().optional(),
-  country: z.string().optional(),
+  city: z.string().min(1, "City is required"),
+  country: z.string().min(1, "Country is required"),
   referralCode: z.string().optional(),
   preferredLanguage: z.string().optional(),
 });
@@ -307,46 +308,77 @@ export default function RegisterPage() {
 
                 <FormField
                   control={form.control}
-                  name="phone"
+                  name="country"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('register.phone')}</FormLabel>
+                      <FormLabel>{t('register.country')} *</FormLabel>
+                      <Select onValueChange={(val) => {
+                        field.onChange(val);
+                        const country = COUNTRIES.find(c => c.name === val);
+                        if (country) {
+                          const currentPhone = form.getValues("phone") || "";
+                          const hasCode = COUNTRIES.some(c => currentPhone.startsWith(c.phoneCode));
+                          if (!currentPhone || hasCode) {
+                            form.setValue("phone", country.phoneCode + " ");
+                          }
+                        }
+                      }} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-country">
+                            <SelectValue placeholder={t('register.selectCountry')} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="max-h-60">
+                          {COUNTRIES.map((c) => (
+                            <SelectItem key={c.code} value={c.name}>
+                              {c.flag} {c.name} ({c.phoneCode})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('register.city')} *</FormLabel>
                       <FormControl>
-                        <Input placeholder="+90 5XX XXX XXXX" {...field} data-testid="input-phone" />
+                        <Input placeholder={t('register.cityPlaceholder')} {...field} data-testid="input-city" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="city"
-                    render={({ field }) => (
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => {
+                    const selectedCountry = COUNTRIES.find(c => c.name === form.getValues("country"));
+                    return (
                       <FormItem>
-                        <FormLabel>{t('register.city')}</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Istanbul" {...field} data-testid="input-city" />
-                        </FormControl>
+                        <FormLabel>{t('register.phone')}</FormLabel>
+                        <div className="flex gap-2">
+                          {selectedCountry && (
+                            <div className="flex items-center gap-1 px-3 bg-muted rounded-md border text-sm shrink-0">
+                              <span>{selectedCountry.flag}</span>
+                              <span>{selectedCountry.phoneCode}</span>
+                            </div>
+                          )}
+                          <FormControl>
+                            <Input placeholder="5XX XXX XXXX" {...field} className="flex-1" data-testid="input-phone" />
+                          </FormControl>
+                        </div>
                         <FormMessage />
                       </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="country"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('register.country')}</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Turkey" {...field} data-testid="input-country" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                    );
+                  }}
+                />
 
                 <FormField
                     control={form.control}

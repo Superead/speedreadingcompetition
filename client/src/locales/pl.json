@@ -120,6 +120,8 @@
     "phone": "Numer telefonu",
     "city": "Miasto",
     "country": "Kraj",
+    "selectCountry": "Wybierz swój kraj",
+    "cityPlaceholder": "Wpisz swoje miasto",
     "referralCode": "Kod polecenia (opcjonalnie)",
     "referralHint": "Wpisz kod znajomego, aby dać mu punkty",
     "competitionLanguage": "Język konkursu",

@@ -120,6 +120,8 @@
     "phone": "फोन नंबर",
     "city": "शहर",
     "country": "देश",
+    "selectCountry": "अपना देश चुनें",
+    "cityPlaceholder": "अपना शहर दर्ज करें",
     "referralCode": "रेफरल कोड (वैकल्पिक)",
     "referralHint": "अपने दोस्त का कोड डालें उन्हें अंक दिलाने के लिए",
     "competitionLanguage": "प्रतियोगिता की भाषा",

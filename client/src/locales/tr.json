@@ -120,6 +120,8 @@
     "phone": "Telefon Numarası",
     "city": "Şehir",
     "country": "Ülke",
+    "selectCountry": "Ülkenizi seçin",
+    "cityPlaceholder": "Şehrinizi girin",
     "referralCode": "Davet Kodu (isteğe bağlı)",
     "referralHint": "Arkadaşınızın kodunu girerek ona puan kazandırın",
     "competitionLanguage": "Yarışma Dili",
