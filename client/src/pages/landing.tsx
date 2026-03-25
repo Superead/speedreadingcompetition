@@ -118,9 +118,9 @@ function getNextUpcomingCompetition(competitions: Competition[]): Competition | 
 }
 
 function getRankIcon(rank: number) {
-  if (rank === 1) return <Medal className="h-5 w-5 text-yellow-500" />;
-  if (rank === 2) return <Medal className="h-5 w-5 text-gray-400" />;
-  if (rank === 3) return <Medal className="h-5 w-5 text-amber-700 dark:text-amber-500" />;
+  if (rank === 1) return <span className="text-2xl">🥇</span>;
+  if (rank === 2) return <span className="text-2xl">🥈</span>;
+  if (rank === 3) return <span className="text-2xl">🥉</span>;
   return null;
 }
 
@@ -220,11 +220,6 @@ function HeroSection() {
               <ArrowRight className="h-4 w-4" />
             </Button>
           </Link>
-          <Link href="/login">
-            <Button size="lg" variant="outline" className="gap-2 text-base px-8">
-              {t('landing.studentLogin')}
-            </Button>
-          </Link>
         </div>
 
         {/* Social proof */}
@@ -310,7 +305,7 @@ function HowItWorksSection() {
   ];
 
   return (
-    <section className="py-20">
+    <section id="how-it-works" className="py-20">
       <div className="container mx-auto px-4 max-w-5xl">
         <div className="text-center mb-12 space-y-3">
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight">{t('landing.howItWorks')}</h2>
@@ -602,7 +597,9 @@ function ResultsLeaderboard({ entries }: { entries: LeaderboardEntry[] }) {
         <div
           key={`${entry.rank}-${entry.name}`}
           className={`flex items-center gap-3 flex-wrap p-3 rounded-lg ${
-            entry.rank <= 3 ? "bg-muted/60" : ""
+            entry.rank === 1 ? "bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800" :
+            entry.rank === 2 ? "bg-gray-50 dark:bg-gray-900/30 border border-gray-200 dark:border-gray-700" :
+            entry.rank === 3 ? "bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800" : ""
           }`}
         >
           <div className="flex items-center justify-center w-8 shrink-0">
@@ -637,7 +634,7 @@ function ResultsSection() {
   const [activeTab, setActiveTab] = useState<string>("kid");
 
   return (
-    <section className="py-20">
+    <section id="leaderboard" className="py-20">
       <div className="container mx-auto px-4 max-w-3xl">
         <div className="text-center mb-10 space-y-3">
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight">{t('landing.leaderboard')}</h2>
@@ -776,6 +773,10 @@ export default function LandingPage() {
               Speed<span className="text-primary">Read</span>
             </span>
           </Link>
+          <nav className="hidden md:flex items-center gap-6 text-sm">
+            <a href="#leaderboard" className="text-muted-foreground hover:text-foreground transition-colors">{t('landing.leaderboard')}</a>
+            <a href="#how-it-works" className="text-muted-foreground hover:text-foreground transition-colors">{t('landing.howItWorks')}</a>
+          </nav>
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
             <ThemeToggle />
@@ -786,9 +787,16 @@ export default function LandingPage() {
                 </Button>
               </Link>
             ) : (
-              <Link href="/login">
-                <Button variant="outline" size="sm">{t('landing.studentLogin')}</Button>
-              </Link>
+              <>
+                <Link href="/register/kid">
+                  <Button size="sm" className="gap-1">
+                    {t('landing.registerNow')}
+                  </Button>
+                </Link>
+                <Link href="/login">
+                  <Button variant="outline" size="sm">{t('landing.login')}</Button>
+                </Link>
+              </>
             )}
           </div>
         </div>
