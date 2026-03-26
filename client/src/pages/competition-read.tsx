@@ -404,7 +404,7 @@ export default function CompetitionReadPage() {
     pageHeight > 0 ? -(currentPage * pageHeight) : 0;
 
   const bookContent =
-    data.book.content?.replace(/\n/g, "<br><br>") ||
+    data.book.content?.replace(/\n{3,}/g, "<br><br>").replace(/\n/g, "<br>") ||
     '<p style="text-align:center;color:#888;padding:3rem 0">No content available</p>';
 
   const contentStyle: React.CSSProperties = {

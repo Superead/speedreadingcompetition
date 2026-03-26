@@ -107,7 +107,11 @@ export default function RegisterPage() {
       city: "",
       country: "",
       referralCode: "",
-      preferredLanguage: "tr",
+      preferredLanguage: (() => {
+        const supported = ["tr", "en", "de", "pl", "fr", "vi", "hi"];
+        const browserLang = navigator.language?.split("-")[0]?.toLowerCase();
+        return supported.includes(browserLang || "") ? browserLang! : "en";
+      })(),
     },
   });
 
