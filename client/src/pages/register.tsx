@@ -132,17 +132,15 @@ export default function RegisterPage() {
     ? competitions?.find(c => c.category === detectedCategory && c.status === "ACTIVE")
     : null;
 
-  // Always show all supported languages so users can pick their preferred competition language
-  const competitionLanguages = activeCompetition
-    ? ((activeCompetition as any).supportedLanguages || "tr").split(",").filter(Boolean)
-    : SUPPORTED_LANGUAGES.map(l => l.code);
+  // Always show all supported languages — user picks their preferred language
+  const competitionLanguages = SUPPORTED_LANGUAGES.map(l => l.code);
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterFormData) => {
       const res = await apiRequest("POST", "/api/auth/register", {
         ...data,
         category: detectedCategory,
-        preferredLanguage: data.preferredLanguage || "tr",
+        preferredLanguage: data.preferredLanguage || "en",
       });
       return res.json();
     },

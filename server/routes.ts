@@ -328,7 +328,7 @@ export async function registerRoutes(
         referrerId,
         passwordHash,
         role: "STUDENT",
-        preferredLanguage: (data as any).preferredLanguage || "tr",
+        preferredLanguage: (data as any).preferredLanguage || "en",
       } as any);
 
       const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "7d" });
