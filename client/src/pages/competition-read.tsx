@@ -217,36 +217,42 @@ export default function CompetitionReadPage() {
 
   // Calculate pages using vertical pagination (scrollHeight / visible height)
   const recalcPages = useCallback(() => {
-    if (!contentRef.current || !containerRef.current) return;
-    const container = containerRef.current;
-    const content = contentRef.current;
+    const doCalc = () => {
+      if (!contentRef.current || !containerRef.current) return;
+      const container = containerRef.current;
+      const content = contentRef.current;
 
-    // Temporarily reset transform so scrollHeight reflects full content
-    const prevTransform = content.style.transform;
-    const prevTransition = content.style.transition;
-    content.style.transition = "none";
-    content.style.transform = "none";
+      // Reset transform so scrollHeight reflects full content
+      content.style.transition = "none";
+      content.style.transform = "none";
 
+      const rawH = container.offsetHeight;
+      if (rawH === 0) return;
+      // Snap page height to a multiple of line-height so text isn't cut mid-line
+      const lineH = fontSize * 1.8;
+      const ch = Math.floor(rawH / lineH) * lineH;
+      setPageHeight(ch);
+      const sh = content.scrollHeight;
+      const pages = Math.max(1, Math.ceil(sh / ch));
+      setTotalPages(pages);
+      setCurrentPage((prev) => Math.min(prev, pages));
+      // Restore transition — React will apply the correct transform on next render
+      content.style.transition = "transform 0.3s ease";
+    };
+
+    // Run after layout is complete — use setTimeout to ensure DOM is painted
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const rawH = container.offsetHeight;
-        if (rawH === 0) return;
-        // Snap page height to a multiple of line-height so text isn't cut mid-line
-        const lineH = fontSize * 1.8;
-        const ch = Math.floor(rawH / lineH) * lineH;
-        setPageHeight(ch);
-        const sh = content.scrollHeight;
-        const pages = Math.max(1, Math.ceil(sh / ch));
-        setTotalPages(pages);
-        setCurrentPage((prev) => Math.min(prev, pages));
-        // Restore — React will apply the correct transform on next render
-        content.style.transition = prevTransition;
+        doCalc();
       });
     });
   }, [fontSize]);
 
   useEffect(() => {
     recalcPages();
+    // Also retry after a short delay for initial mount when content may not be laid out yet
+    const timer = setTimeout(recalcPages, 100);
+    return () => clearTimeout(timer);
   }, [data?.book?.content, fontSize, fontFamily, dualPage, recalcPages]);
 
   // Recalculate on window resize
@@ -625,20 +631,14 @@ export default function CompetitionReadPage() {
                   flexShrink: 0,
                 }}
               >
-                <div style={{
-                  overflow: "hidden",
-                  height: pageHeight > 0 ? `${pageHeight}px` : "100%",
-                  width: "100%",
-                }}>
-                  <div
-                    ref={contentRef}
-                    className="select-none"
-                    data-testid="book-content"
-                    style={{ ...contentStyle, transform: `translateY(${translateY}px)`, transition: "transform 0.3s ease" }}
-                    {...contentHandlers}
-                    dangerouslySetInnerHTML={{ __html: bookContent }}
-                  />
-                </div>
+                <div
+                  ref={contentRef}
+                  className="select-none"
+                  data-testid="book-content"
+                  style={{ ...contentStyle, transform: `translateY(${translateY}px)`, transition: "transform 0.3s ease" }}
+                  {...contentHandlers}
+                  dangerouslySetInnerHTML={{ __html: bookContent }}
+                />
               </div>
             )}
 
