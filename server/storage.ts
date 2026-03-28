@@ -608,9 +608,27 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    const totalQuestionCount = mcqTotalCount;
+    // Combine MCQ + TEXT into a unified comprehension ratio
+    const textQuestions = allQuestions.filter(q => q.type === "TEXT");
+    const textTotalCount = textQuestions.length;
+    let textCorrectPoints = 0;
+    let textMaxPoints = 0;
+
+    for (const tq of textQuestions) {
+      textMaxPoints += (tq.maxPoints || 1);
+      const ans = submissionAnswers.find(a => a.competitionQuestionId === tq.id || a.questionId === tq.id);
+      if (ans) {
+        textCorrectPoints += (ans.points || 0);
+      }
+    }
+
+    const totalQuestionCount = mcqTotalCount + textTotalCount;
     if (totalQuestionCount > 0) {
-      const ratio = mcqCorrectCount / totalQuestionCount;
+      // MCQ: each correct = 1 out of 1 max point
+      // TEXT: points scored out of maxPoints
+      const totalScored = mcqCorrectCount + textCorrectPoints;
+      const totalMax = mcqTotalCount + textMaxPoints;
+      const ratio = totalMax > 0 ? totalScored / totalMax : 0;
       if (ratio >= 0.4) {
         comprehensionScore = ratio * 10;
       } else {
@@ -620,11 +638,14 @@ export class DatabaseStorage implements IStorage {
 
     calculatedFinalScore = comprehensionScore * readingSpeedWPM;
 
+    const manualScore = textCorrectPoints;
+
     return this.updateSubmission(submissionId, {
       mcqTotalCount,
       mcqCorrectCount,
       mcqWrongCount,
       autoScore,
+      manualScore,
       readingSpeedWPM: Math.round(readingSpeedWPM * 100) / 100,
       comprehensionScore: Math.round(comprehensionScore * 100) / 100,
       finalScore: Math.round(calculatedFinalScore * 100) / 100,
@@ -671,21 +692,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async recalculateManualScore(submissionId: string): Promise<Submission | undefined> {
-    const submissionAnswers = await this.getAnswers(submissionId);
-    const textAnswerPoints = submissionAnswers
-      .filter((a) => a.type === "TEXT")
-      .reduce((sum, a) => sum + (a.points || 0), 0);
-
-    const submission = await this.getSubmissionById(submissionId);
-    if (!submission) return undefined;
-
-    const finalScore = (submission.autoScore || 0) + textAnswerPoints;
-
-    return this.updateSubmission(submissionId, {
-      manualScore: textAnswerPoints,
-      finalScore,
-      updatedAt: new Date(),
-    });
+    // Use full recalculation so TEXT answers are included in the unified
+    // comprehensionScore × WPM formula (same as MCQ answers).
+    return this.recalculateSubmissionScores(submissionId);
   }
 
   async publishResults(category: Category): Promise<CompetitionSettings> {

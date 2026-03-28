@@ -199,9 +199,25 @@ function SubmissionDetailDialog({ submissionId, onClose }: { submissionId: strin
     }
   }, [details]);
 
-  // Compute live manual score from local answer scores
+  // Compute live scores using the same unified formula as the server:
+  // comprehensionScore = (totalScored / totalMax) * 10 if ratio >= 0.4
+  // finalScore = comprehensionScore × readingSpeedWPM
   const liveManualScore = Object.values(answerScores).reduce((sum, score) => sum + score, 0);
-  const liveFinalScore = (details?.autoScore || 0) + liveManualScore;
+
+  const liveComprehension = (() => {
+    if (!details) return 0;
+    const mcqCorrect = details.mcqCorrectCount || 0;
+    const mcqTotal = details.mcqTotalCount || 0;
+    const textAnswers = details.answers.filter((a) => a.type === "TEXT");
+    const textMax = textAnswers.reduce((sum, a: any) => sum + (a.question?.maxPoints || 1), 0);
+    const totalScored = mcqCorrect + liveManualScore;
+    const totalMax = mcqTotal + textMax;
+    if (totalMax === 0) return 0;
+    const ratio = totalScored / totalMax;
+    return ratio >= 0.4 ? ratio * 10 : 0;
+  })();
+  const wpm = details?.readingSpeedWPM || 0;
+  const liveFinalScore = Math.round(liveComprehension * wpm * 100) / 100;
 
   const scoreMutation = useMutation({
     mutationFn: async (manualScore: number) => {
@@ -350,10 +366,30 @@ function SubmissionDetailDialog({ submissionId, onClose }: { submissionId: strin
                 </p>
               </div>
               <div className="text-center p-3 bg-muted rounded-md">
+                <p className="text-muted-foreground">Text Score</p>
+                <p className="text-xl font-bold text-blue-600">{liveManualScore}</p>
+                <p className="text-xs text-muted-foreground">
+                  Points assigned by reviewer
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mt-4">
+              <div className="text-center p-3 bg-muted rounded-md">
+                <p className="text-muted-foreground">Reading Speed</p>
+                <p className="text-xl font-bold">{Math.round(wpm)} WPM</p>
+              </div>
+              <div className="text-center p-3 bg-muted rounded-md">
+                <p className="text-muted-foreground">Comprehension</p>
+                <p className="text-xl font-bold">{Math.round(liveComprehension * 100) / 100}</p>
+                <p className="text-xs text-muted-foreground">
+                  (scored / max) × 10
+                </p>
+              </div>
+              <div className="text-center p-3 bg-muted rounded-md">
                 <p className="text-muted-foreground">Final Score</p>
                 <p className="text-xl font-bold text-primary">{liveFinalScore}</p>
                 <p className="text-xs text-muted-foreground">
-                  Auto: {details.autoScore || 0} + Manual: {liveManualScore}
+                  comprehension × WPM
                 </p>
               </div>
             </div>
