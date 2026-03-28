@@ -250,17 +250,29 @@ export default function CompetitionReadPage() {
 
   useEffect(() => {
     recalcPages();
-    // Also retry after a short delay for initial mount when content may not be laid out yet
-    const timer = setTimeout(recalcPages, 100);
-    return () => clearTimeout(timer);
+    // Retry a few times — content may not be laid out immediately after data arrives
+    const t1 = setTimeout(recalcPages, 100);
+    const t2 = setTimeout(recalcPages, 300);
+    const t3 = setTimeout(recalcPages, 600);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [data?.book?.content, fontSize, fontFamily, dualPage, recalcPages]);
 
-  // Recalculate on window resize
+  // Recalculate on window resize or when content element changes size
   useEffect(() => {
     const handleResize = () => recalcPages();
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [recalcPages]);
+
+    // Use ResizeObserver on the content element to catch late layout changes
+    let ro: ResizeObserver | undefined;
+    if (contentRef.current) {
+      ro = new ResizeObserver(recalcPages);
+      ro.observe(contentRef.current);
+    }
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      ro?.disconnect();
+    };
+  }, [recalcPages, data?.book?.content]);
 
   // Navigate to a specific page
   const pageStep = dualPage ? 2 : 1;
