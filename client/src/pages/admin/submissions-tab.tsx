@@ -57,15 +57,18 @@ function TextAnswersSection({
   textAnswers,
   submissionId,
   currentManualScore,
-  onScoreUpdated
+  onScoreUpdated,
+  answerScores,
+  setAnswerScores,
 }: {
   textAnswers: AnswerWithPoints[];
   submissionId: string;
   currentManualScore: number;
   onScoreUpdated: () => void;
+  answerScores: Record<string, number>;
+  setAnswerScores: React.Dispatch<React.SetStateAction<Record<string, number>>>;
 }) {
   const { toast } = useToast();
-  const [answerScores, setAnswerScores] = useState<Record<string, number>>({});
   const [savedScores, setSavedScores] = useState<Record<string, number>>({});
   const [savingAnswerId, setSavingAnswerId] = useState<string | null>(null);
 
@@ -74,7 +77,6 @@ function TextAnswersSection({
     textAnswers.forEach((a) => {
       initial[a.id] = a.points || 0;
     });
-    setAnswerScores(initial);
     setSavedScores(initial);
   }, [textAnswers]);
 
@@ -177,11 +179,29 @@ function TextAnswersSection({
 
 function SubmissionDetailDialog({ submissionId, onClose }: { submissionId: string; onClose: () => void }) {
   const { toast } = useToast();
+  const [answerScores, setAnswerScores] = useState<Record<string, number>>({});
 
   const { data: details, isLoading, refetch } = useQuery<SubmissionDetails>({
     queryKey: ["/api/admin/submissions", submissionId],
     enabled: !!submissionId,
   });
+
+  // Initialize answer scores when details load
+  useEffect(() => {
+    if (details) {
+      const initial: Record<string, number> = {};
+      details.answers
+        .filter((a) => a.type === "TEXT")
+        .forEach((a: any) => {
+          initial[a.id] = a.points || 0;
+        });
+      setAnswerScores(initial);
+    }
+  }, [details]);
+
+  // Compute live manual score from local answer scores
+  const liveManualScore = Object.values(answerScores).reduce((sum, score) => sum + score, 0);
+  const liveFinalScore = (details?.autoScore || 0) + liveManualScore;
 
   const scoreMutation = useMutation({
     mutationFn: async (manualScore: number) => {
@@ -331,27 +351,16 @@ function SubmissionDetailDialog({ submissionId, onClose }: { submissionId: strin
               </div>
               <div className="text-center p-3 bg-muted rounded-md">
                 <p className="text-muted-foreground">Final Score</p>
-                <p className="text-xl font-bold text-primary">{details.finalScore || 0}</p>
+                <p className="text-xl font-bold text-primary">{liveFinalScore}</p>
                 <p className="text-xs text-muted-foreground">
-                  Auto: {details.autoScore || 0} + Manual: {details.manualScore || 0}
+                  Auto: {details.autoScore || 0} + Manual: {liveManualScore}
                 </p>
               </div>
             </div>
             <div className="mt-4 flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Label>Manual Score:</Label>
-                <Input
-                  type="number"
-                  className="w-24"
-                  defaultValue={details.manualScore ?? ""}
-                  onBlur={(e) => {
-                    const value = parseInt(e.target.value);
-                    if (!isNaN(value) && value !== details.manualScore) {
-                      scoreMutation.mutate(value);
-                    }
-                  }}
-                  data-testid="input-detail-manual-score"
-                />
+                <span className="text-lg font-bold w-24 text-center">{liveManualScore}</span>
               </div>
               <Button
                 variant="outline"
@@ -440,11 +449,13 @@ function SubmissionDetailDialog({ submissionId, onClose }: { submissionId: strin
           <TextAnswersSection
             textAnswers={textAnswers}
             submissionId={submissionId}
-            currentManualScore={details.manualScore || 0}
+            currentManualScore={liveManualScore}
             onScoreUpdated={() => {
               queryClient.invalidateQueries({ queryKey: ["/api/admin/submissions"] });
               refetch();
             }}
+            answerScores={answerScores}
+            setAnswerScores={setAnswerScores}
           />
         )}
       </div>
