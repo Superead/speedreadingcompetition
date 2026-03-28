@@ -255,7 +255,7 @@ export default function CompetitionReadPage() {
     const t2 = setTimeout(recalcPages, 300);
     const t3 = setTimeout(recalcPages, 600);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
-  }, [data?.book?.content, fontSize, fontFamily, dualPage, recalcPages]);
+  }, [data?.book?.content, fontSize, fontFamily, dualPage, hasStarted, isReadingActive, recalcPages]);
 
   // Recalculate on window resize or when content element changes size
   useEffect(() => {
