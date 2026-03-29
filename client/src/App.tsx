@@ -14,25 +14,31 @@ import CompetitionReadPage from "@/pages/competition-read";
 import CompetitionQuestionsPage from "@/pages/competition-questions";
 import CompetitionResultsPage from "@/pages/competition-results";
 import AdminDashboard from "@/pages/admin";
+import TeacherDashboard from "@/pages/teacher";
 import ForgotPasswordPage from "@/pages/forgot-password";
 import ResetPasswordPage from "@/pages/reset-password";
 import { useEffect } from "react";
 import "@/lib/i18n";
 
-function ProtectedRoute({ component: Component, adminOnly = false }: { component: React.ComponentType; adminOnly?: boolean }) {
-  const { user, isLoading, isAdmin, isStudent } = useAuth();
+function ProtectedRoute({ component: Component, adminOnly = false, staffOnly = false }: { component: React.ComponentType; adminOnly?: boolean; staffOnly?: boolean }) {
+  const { user, isLoading, isAdmin, isTeacher, isStudent } = useAuth();
   const [, navigate] = useLocation();
+
+  const isStaff = isAdmin || isTeacher;
 
   useEffect(() => {
     if (isLoading) return;
     if (!user) {
-      navigate(adminOnly ? "/admin-login" : "/login", { replace: true });
+      navigate((adminOnly || staffOnly) ? "/admin-login" : "/login", { replace: true });
     } else if (adminOnly && !isAdmin) {
       navigate("/admin-login", { replace: true });
-    } else if (!adminOnly && !isStudent) {
-      navigate("/admin", { replace: true });
+    } else if (staffOnly && !isStaff) {
+      navigate("/admin-login", { replace: true });
+    } else if (!adminOnly && !staffOnly && !isStudent) {
+      if (isAdmin) navigate("/admin", { replace: true });
+      else if (isTeacher) navigate("/teacher", { replace: true });
     }
-  }, [user, isLoading, isAdmin, isStudent, adminOnly, navigate]);
+  }, [user, isLoading, isAdmin, isTeacher, isStudent, isStaff, adminOnly, staffOnly, navigate]);
 
   if (isLoading) {
     return (
@@ -42,9 +48,10 @@ function ProtectedRoute({ component: Component, adminOnly = false }: { component
     );
   }
 
-  if (!user || (adminOnly && !isAdmin) || (!adminOnly && !isStudent)) {
-    return null;
-  }
+  if (!user) return null;
+  if (adminOnly && !isAdmin) return null;
+  if (staffOnly && !isStaff) return null;
+  if (!adminOnly && !staffOnly && !isStudent) return null;
 
   return <Component />;
 }
@@ -70,6 +77,9 @@ function Router() {
       </Route>
       <Route path="/competition/results">
         {() => <ProtectedRoute component={CompetitionResultsPage} />}
+      </Route>
+      <Route path="/teacher">
+        {() => <ProtectedRoute component={TeacherDashboard} staffOnly />}
       </Route>
       <Route path="/admin">
         {() => <ProtectedRoute component={AdminDashboard} adminOnly />}

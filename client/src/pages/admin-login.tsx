@@ -59,7 +59,7 @@ export default function AdminLoginPage() {
   };
 
   if (user) {
-    return <Redirect to={user.role === "ADMIN" ? "/admin" : "/dashboard"} />;
+    return <Redirect to={user.role === "ADMIN" ? "/admin" : user.role === "TEACHER" ? "/teacher" : "/dashboard"} />;
   }
 
   return (

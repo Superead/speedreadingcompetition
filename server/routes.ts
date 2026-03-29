@@ -144,6 +144,13 @@ function adminMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
   next();
 }
 
+function teacherOrAdminMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
+  if (!req.user || (req.user.role !== "TEACHER" && req.user.role !== "ADMIN")) {
+    return res.status(403).json({ error: "Teacher or Admin access required" });
+  }
+  next();
+}
+
 function studentMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
   if (!req.user || req.user.role !== "STUDENT") {
     return res.status(403).json({ error: "Student access required" });
@@ -372,7 +379,7 @@ export async function registerRoutes(
       const data = adminLoginSchema.parse(req.body);
 
       const user = await storage.getUserByEmail(data.email);
-      if (!user || user.role !== "ADMIN") {
+      if (!user || (user.role !== "ADMIN" && user.role !== "TEACHER")) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
@@ -476,6 +483,85 @@ export async function registerRoutes(
   app.get("/api/me", authMiddleware, async (req: AuthRequest, res) => {
     res.json(req.user);
   });
+
+  // ─── Teacher Routes ────────────────────────────────────────────────────────
+
+  app.get("/api/teacher/competitions", authMiddleware, teacherOrAdminMiddleware, async (_req, res) => {
+    try {
+      const allCompetitions = await storage.getAllCompetitions();
+      res.json(allCompetitions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch competitions" });
+    }
+  });
+
+  app.get("/api/teacher/submissions", authMiddleware, teacherOrAdminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const allSubmissions = await storage.getAllSubmissions();
+      res.json(allSubmissions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch submissions" });
+    }
+  });
+
+  app.get("/api/teacher/submissions/:id", authMiddleware, teacherOrAdminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const submission = await storage.getSubmissionWithDetails(id);
+      if (!submission) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
+      res.json(submission);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch submission details" });
+    }
+  });
+
+  app.put("/api/teacher/answers/:answerId/points", authMiddleware, teacherOrAdminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const { answerId } = req.params;
+      const { points } = req.body;
+
+      if (typeof points !== "number" || points < 0) {
+        return res.status(400).json({ error: "Invalid points value" });
+      }
+
+      const answer = await storage.updateAnswerPoints(answerId, points);
+      if (!answer) {
+        return res.status(404).json({ error: "Answer not found" });
+      }
+
+      // Stamp reviewer info on the submission
+      const reviewerName = `${req.user!.name} ${req.user!.surname}`;
+      await storage.updateSubmission(answer.submissionId, {
+        reviewedBy: req.user!.id,
+        reviewedByName: reviewerName,
+        reviewedAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      // Recalculate scores with unified formula
+      const updated = await storage.recalculateManualScore(answer.submissionId);
+      res.json({ answer, submission: updated });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update answer points" });
+    }
+  });
+
+  app.post("/api/teacher/submissions/:id/recalculate", authMiddleware, teacherOrAdminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const submission = await storage.recalculateSubmissionScores(id);
+      if (!submission) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
+      res.json(submission);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to recalculate submission" });
+    }
+  });
+
+  // ─── Student Routes ────────────────────────────────────────────────────────
 
   // Update language preference
   app.put("/api/student/profile/language", authMiddleware, studentMiddleware, async (req: AuthRequest, res) => {
@@ -1300,6 +1386,15 @@ export async function registerRoutes(
       if (!answer) {
         return res.status(404).json({ error: "Answer not found" });
       }
+
+      // Stamp reviewer info
+      const reviewerName = `${req.user!.name} ${req.user!.surname}`;
+      await storage.updateSubmission(answer.submissionId, {
+        reviewedBy: req.user!.id,
+        reviewedByName: reviewerName,
+        reviewedAt: new Date(),
+        updatedAt: new Date(),
+      });
 
       const updatedSubmission = await storage.recalculateManualScore(answer.submissionId);
 

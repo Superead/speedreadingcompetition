@@ -4,7 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
-export const roleEnum = pgEnum("role", ["STUDENT", "ADMIN"]);
+export const roleEnum = pgEnum("role", ["STUDENT", "TEACHER", "ADMIN"]);
 export const categoryEnum = pgEnum("category", ["kid", "teen", "adult"]);
 export const genderEnum = pgEnum("gender", ["male", "female", "other"]);
 export const questionTypeEnum = pgEnum("question_type", ["MCQ", "TEXT"]);
@@ -42,6 +42,7 @@ export const users = pgTable("users", {
   referrerId: varchar("referrer_id"),
   referralPoints: integer("referral_points").default(0),
   preferredLanguage: text("preferred_language").default("tr"),
+  teacherLanguages: text("teacher_languages"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("users_email_idx").on(table.email),
@@ -173,6 +174,9 @@ export const submissions = pgTable("submissions", {
   readingSpeedWPM: real("reading_speed_wpm").default(0),
   comprehensionScore: real("comprehension_score").default(0),
   status: submissionStatusEnum("status").default("SUBMITTED"),
+  reviewedBy: varchar("reviewed_by"),
+  reviewedByName: text("reviewed_by_name"),
+  reviewedAt: timestamp("reviewed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
@@ -441,7 +445,7 @@ export type SiteStat = typeof siteStats.$inferSelect;
 export type InsertSiteStat = z.infer<typeof insertSiteStatSchema>;
 
 export type Category = "kid" | "teen" | "adult";
-export type Role = "STUDENT" | "ADMIN";
+export type Role = "STUDENT" | "TEACHER" | "ADMIN";
 export type Gender = "male" | "female" | "other";
 export type QuestionType = "MCQ" | "TEXT";
 export type SubmissionStatus = "SUBMITTED" | "REVIEWED" | "FINALIZED";

@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Loader2, Eye, RefreshCw } from "lucide-react";
 import type { Question, User, Submission, Category, Competition } from "@shared/schema";
+import { SUPPORTED_LANGUAGES } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -60,6 +61,7 @@ function TextAnswersSection({
   onScoreUpdated,
   answerScores,
   setAnswerScores,
+  apiPrefix = "/api/admin",
 }: {
   textAnswers: AnswerWithPoints[];
   submissionId: string;
@@ -67,6 +69,7 @@ function TextAnswersSection({
   onScoreUpdated: () => void;
   answerScores: Record<string, number>;
   setAnswerScores: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  apiPrefix?: string;
 }) {
   const { toast } = useToast();
   const [savedScores, setSavedScores] = useState<Record<string, number>>({});
@@ -85,7 +88,7 @@ function TextAnswersSection({
   const savePointsMutation = useMutation({
     mutationFn: async ({ answerId, points }: { answerId: string; points: number }) => {
       setSavingAnswerId(answerId);
-      const res = await apiRequest("PUT", `/api/admin/answers/${answerId}/points`, { points });
+      const res = await apiRequest("PUT", `${apiPrefix}/answers/${answerId}/points`, { points });
       return res.json();
     },
     onSuccess: (_, variables) => {
@@ -177,12 +180,12 @@ function TextAnswersSection({
   );
 }
 
-function SubmissionDetailDialog({ submissionId, onClose }: { submissionId: string; onClose: () => void }) {
+function SubmissionDetailDialog({ submissionId, onClose, apiPrefix = "/api/admin" }: { submissionId: string; onClose: () => void; apiPrefix?: string }) {
   const { toast } = useToast();
   const [answerScores, setAnswerScores] = useState<Record<string, number>>({});
 
   const { data: details, isLoading, refetch } = useQuery<SubmissionDetails>({
-    queryKey: ["/api/admin/submissions", submissionId],
+    queryKey: [`${apiPrefix}/submissions`, submissionId],
     enabled: !!submissionId,
   });
 
@@ -221,11 +224,11 @@ function SubmissionDetailDialog({ submissionId, onClose }: { submissionId: strin
 
   const scoreMutation = useMutation({
     mutationFn: async (manualScore: number) => {
-      const res = await apiRequest("PUT", `/api/admin/submissions/${submissionId}/manual-score`, { manualScore });
+      const res = await apiRequest("PUT", `${apiPrefix}/submissions/${submissionId}/manual-score`, { manualScore });
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/submissions"] });
+      queryClient.invalidateQueries({ queryKey: [`${apiPrefix}/submissions`] });
       refetch();
       toast({ title: "Score updated" });
     },
@@ -236,11 +239,11 @@ function SubmissionDetailDialog({ submissionId, onClose }: { submissionId: strin
 
   const recalculateMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/admin/submissions/${submissionId}/recalculate`, {});
+      const res = await apiRequest("POST", `${apiPrefix}/submissions/${submissionId}/recalculate`, {});
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/submissions"] });
+      queryClient.invalidateQueries({ queryKey: [`${apiPrefix}/submissions`] });
       refetch();
       toast({ title: "Scores recalculated" });
     },
@@ -487,11 +490,12 @@ function SubmissionDetailDialog({ submissionId, onClose }: { submissionId: strin
             submissionId={submissionId}
             currentManualScore={liveManualScore}
             onScoreUpdated={() => {
-              queryClient.invalidateQueries({ queryKey: ["/api/admin/submissions"] });
+              queryClient.invalidateQueries({ queryKey: [`${apiPrefix}/submissions`] });
               refetch();
             }}
             answerScores={answerScores}
             setAnswerScores={setAnswerScores}
+            apiPrefix={apiPrefix}
           />
         )}
       </div>
@@ -505,33 +509,43 @@ function SubmissionDetailDialog({ submissionId, onClose }: { submissionId: strin
   );
 }
 
-function SubmissionsTab() {
+function SubmissionsTab({
+  apiPrefix = "/api/admin",
+  showReviewerColumn = false,
+  showLanguageFilter = false,
+}: {
+  apiPrefix?: string;
+  showReviewerColumn?: boolean;
+  showLanguageFilter?: boolean;
+} = {}) {
   const { toast } = useToast();
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterCompetition, setFilterCompetition] = useState<string>("all");
+  const [filterLanguage, setFilterLanguage] = useState<string>("all");
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
 
   const { data: submissions, isLoading } = useQuery<(Submission & { user?: User; competitionId?: string })[]>({
-    queryKey: ["/api/admin/submissions"],
+    queryKey: [`${apiPrefix}/submissions`],
   });
 
   const { data: competitions } = useQuery<Competition[]>({
-    queryKey: ["/api/admin/competitions"],
+    queryKey: [`${apiPrefix}/competitions`],
   });
 
   const filteredSubmissions = submissions?.filter((s) => {
     if (filterCategory !== "all" && s.category !== filterCategory) return false;
     if (filterCompetition !== "all" && s.competitionId !== filterCompetition) return false;
+    if (filterLanguage !== "all" && (s as any).language !== filterLanguage) return false;
     return true;
   });
 
   const scoreMutation = useMutation({
     mutationFn: async ({ id, manualScore }: { id: string; manualScore: number }) => {
-      const res = await apiRequest("PUT", `/api/admin/submissions/${id}/manual-score`, { manualScore });
+      const res = await apiRequest("PUT", `${apiPrefix}/submissions/${id}/manual-score`, { manualScore });
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/submissions"] });
+      queryClient.invalidateQueries({ queryKey: [`${apiPrefix}/submissions`] });
       toast({ title: "Score updated" });
     },
     onError: (error: Error) => {
@@ -583,6 +597,22 @@ function SubmissionsTab() {
             </SelectContent>
           </Select>
         </div>
+        {showLanguageFilter && (
+          <div className="flex items-center gap-2">
+            <Label>Language</Label>
+            <Select value={filterLanguage} onValueChange={setFilterLanguage}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Languages</SelectItem>
+                {SUPPORTED_LANGUAGES.map((lang) => (
+                  <SelectItem key={lang.code} value={lang.code}>{lang.flag} {lang.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <Badge variant="secondary">{filteredSubmissions?.length || 0} submissions</Badge>
       </div>
 
@@ -595,12 +625,14 @@ function SubmissionsTab() {
                   <TableHead>Student</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Competition</TableHead>
+                  {showLanguageFilter && <TableHead>Lang</TableHead>}
                   <TableHead>Reading</TableHead>
                   <TableHead>Answer</TableHead>
                   <TableHead>MCQ</TableHead>
                   <TableHead>Auto</TableHead>
                   <TableHead>Manual</TableHead>
                   <TableHead>Final</TableHead>
+                  {showReviewerColumn && <TableHead>Reviewed By</TableHead>}
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -618,6 +650,14 @@ function SubmissionsTab() {
                       {competitions?.find(c => c.id === submission.competitionId)?.title ||
                         <Badge variant="outline">{getCategoryTitle(submission.category)}</Badge>}
                     </TableCell>
+                    {showLanguageFilter && (
+                      <TableCell className="text-sm">
+                        {(() => {
+                          const lang = SUPPORTED_LANGUAGES.find(l => l.code === (submission as any).language);
+                          return lang ? `${lang.flag} ${lang.code.toUpperCase()}` : (submission as any).language || "-";
+                        })()}
+                      </TableCell>
+                    )}
                     <TableCell>{formatDuration(submission.readingSeconds)}</TableCell>
                     <TableCell>{formatDuration(submission.answerSeconds)}</TableCell>
                     <TableCell>
@@ -644,6 +684,17 @@ function SubmissionsTab() {
                       />
                     </TableCell>
                     <TableCell className="font-bold">{submission.finalScore ?? "-"}</TableCell>
+                    {showReviewerColumn && (
+                      <TableCell className="text-xs">
+                        {(submission as any).reviewedByName ? (
+                          <Badge variant="outline" className="text-xs">
+                            {(submission as any).reviewedByName}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell>
                       {submission.answerEndAt ? (
                         <Badge variant="default" className="bg-green-600">Completed</Badge>
@@ -678,6 +729,7 @@ function SubmissionsTab() {
           <SubmissionDetailDialog
             submissionId={selectedSubmissionId}
             onClose={() => setSelectedSubmissionId(null)}
+            apiPrefix={apiPrefix}
           />
         )}
       </Dialog>
