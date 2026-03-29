@@ -617,8 +617,9 @@ function SubmissionsTab({
       </div>
 
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="pt-6 overflow-x-auto">
           <ScrollArea className="h-[500px]">
+            <div className="min-w-[900px]">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -720,6 +721,7 @@ function SubmissionsTab({
                 ))}
               </TableBody>
             </Table>
+            </div>
           </ScrollArea>
         </CardContent>
       </Card>
