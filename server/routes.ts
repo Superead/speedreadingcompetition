@@ -1134,6 +1134,63 @@ export async function registerRoutes(
     }
   });
 
+  // ─── Teacher Management (Admin only)
+  app.get("/api/admin/teachers", authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      const teachers = users.filter(u => u.role === "TEACHER");
+      res.json(teachers);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch teachers" });
+    }
+  });
+
+  app.post("/api/admin/teachers", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const { email, password, name, surname, teacherLanguages } = req.body;
+      if (!email || !password || !name || !surname) {
+        return res.status(400).json({ error: "Email, password, name, and surname are required" });
+      }
+
+      const existing = await storage.getUserByEmail(email);
+      if (existing) {
+        return res.status(409).json({ error: "A user with this email already exists" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const id = crypto.randomUUID();
+
+      const teacher = await storage.createUser({
+        id,
+        email,
+        passwordHash: hashedPassword,
+        name,
+        surname,
+        role: "TEACHER" as any,
+        teacherLanguages: teacherLanguages || null,
+      });
+
+      res.status(201).json(teacher);
+    } catch (error) {
+      console.error("Create teacher error:", error);
+      res.status(500).json({ error: "Failed to create teacher" });
+    }
+  });
+
+  app.delete("/api/admin/teachers/:id", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const user = await storage.getUser(id);
+      if (!user || user.role !== "TEACHER") {
+        return res.status(404).json({ error: "Teacher not found" });
+      }
+      await storage.deleteUser(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete teacher" });
+    }
+  });
+
   app.get("/api/admin/submissions", authMiddleware, adminMiddleware, async (req, res) => {
     try {
       const submissions = await storage.getAllSubmissions();
