@@ -218,6 +218,10 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(users).where(eq(users.role, "STUDENT"));
   }
 
+  async getUsersByRole(role: string): Promise<User[]> {
+    return db.select().from(users).where(eq(users.role, role as any));
+  }
+
   async getUsersByCategory(category: Category): Promise<User[]> {
     return db.select().from(users).where(and(eq(users.role, "STUDENT"), eq(users.category, category)));
   }

@@ -1137,8 +1137,7 @@ export async function registerRoutes(
   // ─── Teacher Management (Admin only)
   app.get("/api/admin/teachers", authMiddleware, adminMiddleware, async (req, res) => {
     try {
-      const users = await storage.getAllUsers();
-      const teachers = users.filter(u => u.role === "TEACHER");
+      const teachers = await storage.getUsersByRole("TEACHER");
       res.json(teachers);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch teachers" });
