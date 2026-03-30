@@ -619,32 +619,42 @@ function SubmissionsTab({
       <Card>
         <CardContent className="pt-6 overflow-x-auto">
           <ScrollArea className="h-[500px]">
-            <div className="min-w-[900px]">
-            <Table>
+            <div className="min-w-[1100px]">
+            <Table className="text-sm">
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[80px] sticky right-0 bg-background z-10">Actions</TableHead>
                   <TableHead>Student</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead className="hidden md:table-cell">Email</TableHead>
                   <TableHead>Competition</TableHead>
-                  {showLanguageFilter && <TableHead>Lang</TableHead>}
-                  <TableHead>Reading</TableHead>
-                  <TableHead>Answer</TableHead>
-                  <TableHead>MCQ</TableHead>
-                  <TableHead>Auto</TableHead>
-                  <TableHead>Manual</TableHead>
-                  <TableHead>Final</TableHead>
+                  {showLanguageFilter && <TableHead className="w-[50px]">Lang</TableHead>}
+                  <TableHead className="w-[70px]">Reading</TableHead>
+                  <TableHead className="w-[70px]">Answer</TableHead>
+                  <TableHead className="w-[60px]">MCQ</TableHead>
+                  <TableHead className="w-[50px]">Auto</TableHead>
+                  <TableHead className="w-[60px]">Manual</TableHead>
+                  <TableHead className="w-[70px]">Final</TableHead>
                   {showReviewerColumn && <TableHead>Reviewed By</TableHead>}
                   <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredSubmissions?.map((submission) => (
                   <TableRow key={submission.id} data-testid={`row-submission-${submission.id}`}>
+                    <TableCell className="sticky right-0 bg-background z-10">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setSelectedSubmissionId(submission.id)}
+                        data-testid={`button-view-details-${submission.id}`}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                     <TableCell className="font-medium">
                       {(submission as any).userName || "Unknown"}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="hidden md:table-cell text-muted-foreground">
                       {(submission as any).userEmail || "-"}
                     </TableCell>
                     <TableCell className="text-sm">
@@ -706,16 +716,6 @@ function SubmissionsTab({
                       ) : (
                         <Badge variant="outline">Not Started</Badge>
                       )}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setSelectedSubmissionId(submission.id)}
-                        data-testid={`button-view-details-${submission.id}`}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
