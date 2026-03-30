@@ -131,10 +131,8 @@ export default function LoginPage() {
                 />
 
                 <div className="text-right">
-                  <Link href="/forgot-password">
-                    <Button variant="link" className="p-0 h-auto text-xs text-muted-foreground">
-                      {t('login.forgotPassword')}
-                    </Button>
+                  <Link href="/forgot-password" className="text-xs text-muted-foreground hover:underline">
+                    {t('login.forgotPassword')}
                   </Link>
                 </div>
 
