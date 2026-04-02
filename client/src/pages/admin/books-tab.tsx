@@ -55,7 +55,10 @@ function BooksTab() {
 
   useEffect(() => {
     if (competitions && competitions.length > 0 && !selectedCompetitionId) {
-      setSelectedCompetitionId(competitions[0].id);
+      const comp = competitions[0];
+      setSelectedCompetitionId(comp.id);
+      const langs = ((comp as any).supportedLanguages || "tr").split(",");
+      setSelectedLanguage(langs[0] || "tr");
     }
   }, [competitions, selectedCompetitionId]);
 
@@ -237,7 +240,12 @@ function BooksTab() {
     <div className="space-y-6">
       <div className="flex items-center gap-4 flex-wrap">
         <Label>Competition</Label>
-        <Select value={selectedCompetitionId} onValueChange={(v) => { setSelectedCompetitionId(v); setSelectedLanguage("tr"); }}>
+        <Select value={selectedCompetitionId} onValueChange={(v) => {
+          setSelectedCompetitionId(v);
+          const comp = competitions?.find((c: any) => c.id === v);
+          const langs = ((comp as any)?.supportedLanguages || "tr").split(",");
+          setSelectedLanguage(langs[0] || "tr");
+        }}>
           <SelectTrigger className="w-80" data-testid="select-book-competition">
             <SelectValue placeholder="Select a competition" />
           </SelectTrigger>
