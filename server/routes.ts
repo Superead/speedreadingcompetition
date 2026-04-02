@@ -712,7 +712,9 @@ export async function registerRoutes(
         answeringDurationMinutes: competition.answeringDurationMinutes,
       } : null;
 
-      res.json({ book, submission, settings, competition });
+      // Strip fileData (base64 PDF) from response — served via /api/books/:id/file
+      const bookResponse = book ? { ...book, fileData: undefined } : null;
+      res.json({ book: bookResponse, submission, settings, competition });
     } catch (error) {
       res.status(500).json({ error: "Failed to load reading data" });
     }
@@ -1845,7 +1847,7 @@ export async function registerRoutes(
     try {
       const language = req.query.language as string | undefined;
       const book = await storage.getCompetitionBook(req.params.id, language);
-      res.json(book || null);
+      res.json(book ? { ...book, fileData: undefined } : null);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch book" });
     }
@@ -1855,7 +1857,7 @@ export async function registerRoutes(
   app.get("/api/admin/competitions/:id/books", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
     try {
       const books = await storage.getCompetitionBooks(req.params.id);
-      res.json(books);
+      res.json(books.map(b => ({ ...b, fileData: undefined })));
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch books" });
     }
@@ -1885,6 +1887,23 @@ export async function registerRoutes(
     }
   });
 
+  // Serve PDF from database
+  app.get("/api/books/:id/file", async (req, res) => {
+    try {
+      const book = await storage.getCompetitionBookById(req.params.id);
+      if (!book || !book.fileData) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      const pdfBuffer = Buffer.from(book.fileData, "base64");
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Length", pdfBuffer.length);
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.send(pdfBuffer);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to serve file" });
+    }
+  });
+
   // Upload PDF for competition book
   app.post("/api/admin/competitions/:id/book/upload", authMiddleware, adminMiddleware, (req: AuthRequest, res, next) => {
     upload.single("file")(req, res, async (err: any) => {
@@ -1898,16 +1917,26 @@ export async function registerRoutes(
         }
         const language = (req.body.language as string) || (req.query.language as string) || "tr";
         const title = (req.body.title as string) || file.originalname.replace(/\.pdf$/i, "");
-        const fileUrl = `/uploads/${file.filename}`;
         const wordCount = parseInt(req.body.wordCount as string) || 0;
+        // Store PDF as base64 in database (filesystem is ephemeral on Railway)
+        const fileData = fs.readFileSync(file.path).toString("base64");
         const book = await storage.upsertCompetitionBook(req.params.id, {
           title,
-          fileUrl,
+          fileUrl: null as any,
+          fileData,
           content: null,
           wordCount,
         }, language);
-        res.json(book);
+        // Set fileUrl to the serve endpoint
+        const updated = await storage.upsertCompetitionBook(req.params.id, {
+          title,
+          fileUrl: `/api/books/${book.id}/file`,
+        }, language);
+        // Clean up temp file
+        fs.unlinkSync(file.path);
+        res.json(updated);
       } catch (error) {
+        console.error("Upload error:", error);
         res.status(500).json({ error: "Failed to save uploaded book" });
       }
     });

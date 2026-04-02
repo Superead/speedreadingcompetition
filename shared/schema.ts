@@ -122,6 +122,7 @@ export const competitionBooks = pgTable("competition_books", {
   language: text("language").notNull().default("tr"),
   title: text("title").notNull(),
   fileUrl: text("file_url"),
+  fileData: text("file_data"),
   content: text("content"),
   wordCount: integer("word_count").default(0),
   createdAt: timestamp("created_at").defaultNow(),

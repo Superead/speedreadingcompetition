@@ -814,6 +814,11 @@ export class DatabaseStorage implements IStorage {
     return book || undefined;
   }
 
+  async getCompetitionBookById(id: string): Promise<CompetitionBook | undefined> {
+    const [book] = await db.select().from(competitionBooks).where(eq(competitionBooks.id, id));
+    return book || undefined;
+  }
+
   async getCompetitionBooks(competitionId: string): Promise<CompetitionBook[]> {
     return db.select().from(competitionBooks).where(eq(competitionBooks.competitionId, competitionId));
   }
