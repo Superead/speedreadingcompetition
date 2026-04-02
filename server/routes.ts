@@ -77,8 +77,9 @@ const settingsUpdateSchema = z.object({
 
 const bookSchema = z.object({
   title: z.string().min(1, "Title is required"),
-  content: z.string().optional(),
+  content: z.string().optional().nullable(),
   fileUrl: z.string().optional(),
+  wordCount: z.number().optional(),
 });
 
 const questionCreateSchema = z.object({
@@ -1898,11 +1899,12 @@ export async function registerRoutes(
         const language = (req.body.language as string) || (req.query.language as string) || "tr";
         const title = (req.body.title as string) || file.originalname.replace(/\.pdf$/i, "");
         const fileUrl = `/uploads/${file.filename}`;
+        const wordCount = parseInt(req.body.wordCount as string) || 0;
         const book = await storage.upsertCompetitionBook(req.params.id, {
           title,
           fileUrl,
           content: null,
-          wordCount: 0,
+          wordCount,
         }, language);
         res.json(book);
       } catch (error) {

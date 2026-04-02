@@ -46,6 +46,7 @@ function BooksTab() {
   const [inputMode, setInputMode] = useState<InputMode>("text");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<string>("");
+  const [pdfWordCount, setPdfWordCount] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: competitions, isLoading: competitionsLoading } = useQuery<any[]>({
@@ -97,6 +98,7 @@ function BooksTab() {
     if (currentBook) {
       setBookTitle(currentBook.title);
       setBookContent(currentBook.content || "");
+      setPdfWordCount(currentBook.wordCount ? String(currentBook.wordCount) : "");
       if (currentBook.fileUrl && !currentBook.content) {
         setInputMode("pdf");
       } else {
@@ -105,6 +107,7 @@ function BooksTab() {
     } else {
       setBookTitle("");
       setBookContent("");
+      setPdfWordCount("");
       setInputMode("text");
     }
     setSelectedFile(null);
@@ -112,7 +115,7 @@ function BooksTab() {
   }, [currentBook]);
 
   const saveMutation = useMutation({
-    mutationFn: async (data: { title: string; content: string }) => {
+    mutationFn: async (data: { title: string; content?: string | null; fileUrl?: string; wordCount?: number }) => {
       const res = await apiRequest("POST", `/api/admin/competitions/${selectedCompetitionId}/book`, { ...data, language: selectedLanguage });
       return res.json();
     },
@@ -129,12 +132,13 @@ function BooksTab() {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: async ({ file, title }: { file: File; title: string }) => {
+    mutationFn: async ({ file, title, wordCount }: { file: File; title: string; wordCount?: number }) => {
       setUploadProgress("Uploading...");
       const formData = new FormData();
       formData.append("file", file);
       formData.append("title", title);
       formData.append("language", selectedLanguage);
+      if (wordCount && wordCount > 0) formData.append("wordCount", String(wordCount));
       const res = await fetch(`/api/admin/competitions/${selectedCompetitionId}/book/upload`, {
         method: "POST",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -173,6 +177,7 @@ function BooksTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/competitions"] });
       setBookTitle("");
       setBookContent("");
+      setPdfWordCount("");
       setSelectedFile(null);
       setUploadProgress("");
       toast({ title: "Book deleted" });
@@ -211,7 +216,10 @@ function BooksTab() {
 
   const handleSave = () => {
     if (inputMode === "pdf" && selectedFile) {
-      uploadMutation.mutate({ file: selectedFile, title: bookTitle });
+      uploadMutation.mutate({ file: selectedFile, title: bookTitle, wordCount: parseInt(pdfWordCount) || 0 });
+    } else if (inputMode === "pdf" && currentBook?.fileUrl && pdfWordCount) {
+      // Update word count for existing PDF without re-uploading
+      saveMutation.mutate({ title: bookTitle, content: null as any, fileUrl: currentBook.fileUrl, wordCount: parseInt(pdfWordCount) || 0 });
     } else {
       saveMutation.mutate({ title: bookTitle, content: bookContent });
     }
@@ -221,6 +229,9 @@ function BooksTab() {
   const canSave = bookTitle && selectedCompetitionId && (
     inputMode === "text" ? true : !!selectedFile || !!currentBook?.fileUrl
   );
+  const buttonLabel = inputMode === "pdf"
+    ? (selectedFile ? "Upload PDF" : currentBook?.fileUrl ? "Update Book" : "Save Book")
+    : "Save Book";
 
   return (
     <div className="space-y-6">
@@ -370,6 +381,21 @@ function BooksTab() {
                   </a>
                 </div>
               )}
+              <div className="space-y-2">
+                <Label htmlFor="pdfWordCount">Word Count (required for WPM calculation)</Label>
+                <Input
+                  id="pdfWordCount"
+                  type="number"
+                  value={pdfWordCount}
+                  onChange={(e) => setPdfWordCount(e.target.value)}
+                  placeholder="Enter total word count of the PDF"
+                />
+                {currentBook?.wordCount ? (
+                  <p className="text-xs text-muted-foreground">Current word count: {currentBook.wordCount}</p>
+                ) : (
+                  <p className="text-xs text-yellow-600 font-medium">No word count set — WPM scoring won't work without this!</p>
+                )}
+              </div>
             </div>
           )}
 
@@ -381,7 +407,7 @@ function BooksTab() {
               data-testid="button-save-book"
             >
               {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : inputMode === "pdf" ? <Upload className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-              {inputMode === "pdf" ? (selectedFile ? "Upload PDF" : "Save Book") : "Save Book"}
+              {buttonLabel}
             </Button>
             {currentBook && (
               <AlertDialog>
