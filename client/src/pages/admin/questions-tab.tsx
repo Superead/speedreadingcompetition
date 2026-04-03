@@ -68,7 +68,10 @@ function QuestionsTab() {
 
   useEffect(() => {
     if (competitions && competitions.length > 0 && !selectedCompetitionId) {
-      setSelectedCompetitionId(competitions[0].id);
+      const comp = competitions[0];
+      setSelectedCompetitionId(comp.id);
+      const langs = ((comp as any).supportedLanguages || "tr").split(",");
+      setSelectedLanguage(langs[0] || "tr");
     }
   }, [competitions, selectedCompetitionId]);
 
@@ -202,7 +205,12 @@ function QuestionsTab() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-4 flex-wrap">
           <Label>Competition</Label>
-          <Select value={selectedCompetitionId} onValueChange={(v) => { setSelectedCompetitionId(v); setSelectedLanguage("tr"); }}>
+          <Select value={selectedCompetitionId} onValueChange={(v) => {
+            setSelectedCompetitionId(v);
+            const comp = competitions?.find((c: any) => c.id === v);
+            const langs = ((comp as any)?.supportedLanguages || "tr").split(",");
+            setSelectedLanguage(langs[0] || "tr");
+          }}>
             <SelectTrigger className="w-72" data-testid="select-questions-competition">
               <SelectValue placeholder="Select a competition" />
             </SelectTrigger>
