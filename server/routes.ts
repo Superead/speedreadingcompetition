@@ -1204,6 +1204,26 @@ export async function registerRoutes(
     }
   });
 
+  app.put("/api/admin/teachers/:id", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const user = await storage.getUser(id);
+      if (!user || user.role !== "TEACHER") {
+        return res.status(404).json({ error: "Teacher not found" });
+      }
+      const { password, teacherLanguages, name, surname } = req.body;
+      const updates: any = {};
+      if (password) updates.passwordHash = await bcrypt.hash(password, 10);
+      if (teacherLanguages !== undefined) updates.teacherLanguages = teacherLanguages;
+      if (name) updates.name = name;
+      if (surname) updates.surname = surname;
+      const updated = await storage.updateUser(id, updates);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update teacher" });
+    }
+  });
+
   app.delete("/api/admin/teachers/:id", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
@@ -1211,7 +1231,12 @@ export async function registerRoutes(
       if (!user || user.role !== "TEACHER") {
         return res.status(404).json({ error: "Teacher not found" });
       }
-      await storage.deleteUser(id);
+      try {
+        await storage.deleteUser(id);
+      } catch (e) {
+        // If delete fails due to foreign keys, demote to STUDENT instead
+        await storage.updateUser(id, { role: "STUDENT" as any, teacherLanguages: null } as any);
+      }
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete teacher" });

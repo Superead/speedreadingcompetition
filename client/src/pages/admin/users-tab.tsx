@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Download, Plus, Trash2, Loader2, GraduationCap } from "lucide-react";
+import { Download, Plus, Trash2, Loader2, GraduationCap, Pencil, KeyRound } from "lucide-react";
 import type { User, Category } from "@shared/schema";
 import { SUPPORTED_LANGUAGES } from "@shared/schema";
 import {
@@ -37,6 +37,8 @@ function getCategoryTitle(category: string) {
 function TeacherSection() {
   const { toast } = useToast();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [editingTeacher, setEditingTeacher] = useState<User | null>(null);
+  const [newPassword, setNewPassword] = useState("");
   const [form, setForm] = useState({ email: "", password: "", name: "", surname: "", languages: [] as string[] });
 
   const { data: teachers, isLoading } = useQuery<User[]>({
@@ -65,16 +67,32 @@ function TeacherSection() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await apiRequest("PUT", `/api/admin/teachers/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/teachers"] });
+      toast({ title: "Teacher updated" });
+      setEditingTeacher(null);
+      setNewPassword("");
+    },
+    onError: () => {
+      toast({ title: "Failed to update teacher", variant: "destructive" });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiRequest("DELETE", `/api/admin/teachers/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/teachers"] });
-      toast({ title: "Teacher deleted" });
+      toast({ title: "Teacher removed" });
     },
     onError: () => {
-      toast({ title: "Failed to delete teacher", variant: "destructive" });
+      toast({ title: "Failed to remove teacher", variant: "destructive" });
     },
   });
 
@@ -133,18 +151,29 @@ function TeacherSection() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => {
-                          if (confirm(`Delete teacher ${teacher.name} ${teacher.surname}?`)) {
-                            deleteMutation.mutate(teacher.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="Reset password"
+                          onClick={() => { setEditingTeacher(teacher); setNewPassword(""); }}
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          title="Remove teacher"
+                          onClick={() => {
+                            if (confirm(`Remove teacher ${teacher.name} ${teacher.surname}?`)) {
+                              deleteMutation.mutate(teacher.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -207,6 +236,69 @@ function TeacherSection() {
             >
               {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Create Teacher
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit / Reset Password Dialog */}
+      <Dialog open={!!editingTeacher} onOpenChange={(open) => { if (!open) { setEditingTeacher(null); setNewPassword(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Teacher: {editingTeacher?.name} {editingTeacher?.surname}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input value={editingTeacher?.email || ""} disabled className="bg-muted" />
+            </div>
+            <div className="space-y-2">
+              <Label>New Password</Label>
+              <Input
+                type="password"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                placeholder="Enter new password (leave empty to keep current)"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Languages</Label>
+              <div className="flex flex-wrap gap-3">
+                {SUPPORTED_LANGUAGES.map(lang => {
+                  const currentLangs = ((editingTeacher as any)?.teacherLanguages || "").split(",").filter(Boolean);
+                  return (
+                    <label key={lang.code} className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox
+                        checked={currentLangs.includes(lang.code)}
+                        onCheckedChange={(checked) => {
+                          if (!editingTeacher) return;
+                          const langs = currentLangs.filter((l: string) => l !== lang.code);
+                          if (checked) langs.push(lang.code);
+                          setEditingTeacher({ ...editingTeacher, teacherLanguages: langs.join(",") } as any);
+                        }}
+                      />
+                      <span className="text-sm">{lang.flag} {lang.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setEditingTeacher(null); setNewPassword(""); }}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!editingTeacher) return;
+                const data: any = {
+                  teacherLanguages: (editingTeacher as any).teacherLanguages || "",
+                };
+                if (newPassword) data.password = newPassword;
+                updateMutation.mutate({ id: editingTeacher.id, data });
+              }}
+              disabled={updateMutation.isPending}
+            >
+              {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>
