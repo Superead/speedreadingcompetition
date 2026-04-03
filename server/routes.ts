@@ -630,16 +630,23 @@ export async function registerRoutes(
         const reg = await storage.getRegistration(competition.id, user.id);
         studentLang = reg?.language || (user as any).preferredLanguage || "tr";
         book = await storage.getCompetitionBook(competition.id, studentLang);
+
+        // If no book in student's language, try the first available book
+        if (!book) {
+          const allBooks = await storage.getCompetitionBooks(competition.id);
+          if (allBooks.length > 0) {
+            book = allBooks[0];
+            studentLang = book.language;
+          }
+        }
+
         submission = await storage.getCompetitionSubmission(competition.id, user.id);
 
-        // Auto-register student for the active competition if registration is open
-        const now = new Date();
-        const regOpen = !competition.registrationStartTime || now >= new Date(competition.registrationStartTime);
-        const regNotClosed = !competition.registrationEndTime || now <= new Date(competition.registrationEndTime);
-        if (regOpen && regNotClosed) {
-          if (!reg) {
-            await storage.registerForCompetition(competition.id, user.id, (user as any).preferredLanguage || "tr");
-          }
+        // Auto-register student for the active competition (even after registration closes)
+        if (!reg) {
+          try {
+            await storage.registerForCompetition(competition.id, user.id, studentLang);
+          } catch (e) { /* ignore duplicate registration errors */ }
         }
       }
 
@@ -700,8 +707,18 @@ export async function registerRoutes(
 
       if (competition) {
         const reg = await storage.getRegistration(competition.id, user.id);
-        const studentLang = reg?.language || (user as any).preferredLanguage || "tr";
+        let studentLang = reg?.language || (user as any).preferredLanguage || "tr";
         book = await storage.getCompetitionBook(competition.id, studentLang);
+
+        // Fallback: if no book in student's language, use first available
+        if (!book) {
+          const allBooks = await storage.getCompetitionBooks(competition.id);
+          if (allBooks.length > 0) {
+            book = allBooks[0];
+            studentLang = book.language;
+          }
+        }
+
         submission = await storage.getCompetitionSubmission(competition.id, user.id);
       }
 
@@ -826,11 +843,19 @@ export async function registerRoutes(
       }
 
       const reg = await storage.getRegistration(competition.id, user.id);
-      const studentLang = reg?.language || (user as any).preferredLanguage || "tr";
-      const [questions, submission] = await Promise.all([
-        storage.getCompetitionQuestions(competition.id, studentLang),
-        storage.getCompetitionSubmission(competition.id, user.id),
-      ]);
+      let studentLang = reg?.language || (user as any).preferredLanguage || "tr";
+      let questions = await storage.getCompetitionQuestions(competition.id, studentLang);
+
+      // Fallback: if no questions in student's language, try first available book's language
+      if (questions.length === 0) {
+        const allBooks = await storage.getCompetitionBooks(competition.id);
+        if (allBooks.length > 0) {
+          studentLang = allBooks[0].language;
+          questions = await storage.getCompetitionQuestions(competition.id, studentLang);
+        }
+      }
+
+      const submission = await storage.getCompetitionSubmission(competition.id, user.id);
 
       let userAnswers: any[] = [];
       if (submission) {
