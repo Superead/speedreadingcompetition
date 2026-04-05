@@ -64,7 +64,7 @@ const settingsUpdateSchema = z.object({
   if (regStart && regEnd && regStart >= regEnd) {
     return false;
   }
-  if (regEnd && compStart && regEnd > compStart) {
+  if (regEnd && compEnd && regEnd > compEnd) {
     return false;
   }
   if (compStart && compEnd && compStart >= compEnd) {
@@ -72,7 +72,7 @@ const settingsUpdateSchema = z.object({
   }
   return true;
 }, {
-  message: "Invalid time sequence. Registration must start before it ends, registration must end before/at competition start, and competition must start before it ends."
+  message: "Invalid time sequence. Registration must start before it ends, registration must end before/at competition end, and competition must start before it ends."
 });
 
 const bookSchema = z.object({

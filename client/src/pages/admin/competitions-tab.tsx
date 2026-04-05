@@ -243,9 +243,9 @@ function CompetitionsTab() {
         errors.push("Competition start must be before competition end");
       }
     }
-    if (formData.registrationEndTime && formData.competitionStartTime) {
-      if (new Date(formData.registrationEndTime) > new Date(formData.competitionStartTime)) {
-        errors.push("Registration must end before or when competition starts");
+    if (formData.registrationEndTime && formData.competitionEndTime) {
+      if (new Date(formData.registrationEndTime) > new Date(formData.competitionEndTime)) {
+        errors.push("Registration must end before or when competition ends");
       }
     }
     if (formData.readingDurationMinutes < 1) errors.push("Reading duration must be at least 1 minute");
