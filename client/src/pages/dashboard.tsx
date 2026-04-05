@@ -12,6 +12,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { safeDate } from "@/lib/date";
 import {
   BookOpen, Copy, Trophy, Users, Clock, LogOut, Gift,
   ExternalLink, CheckCircle, Award, Medal, Share2,
@@ -210,10 +211,10 @@ export default function DashboardPage() {
   const canStartReading = () => {
     if (!data?.settings?.competitionStartTime) return false;
     const now = new Date();
-    const start = new Date(data.settings.competitionStartTime);
+    const start = safeDate(data.settings.competitionStartTime);
     if (now < start) return false;
     if (data?.settings?.competitionEndTime) {
-      const end = new Date(data.settings.competitionEndTime);
+      const end = safeDate(data.settings.competitionEndTime);
       if (now > end) return false;
     }
     return !data.submission?.readingStartAt;
@@ -221,7 +222,7 @@ export default function DashboardPage() {
 
   const isCompetitionEnded = () => {
     if (!data?.settings?.competitionEndTime) return false;
-    return new Date() > new Date(data.settings.competitionEndTime);
+    return new Date() > safeDate(data.settings.competitionEndTime);
   };
 
   const hasCompletedCompetition = () => data?.submission?.answerEndAt != null;
@@ -492,7 +493,7 @@ export default function DashboardPage() {
                   </div>
                 ) : data?.settings?.competitionStartTime ? (
                   <div className="space-y-4">
-                    {new Date() < new Date(data.settings.competitionStartTime) ? (
+                    {new Date() < safeDate(data.settings.competitionStartTime) ? (
                       <div className="text-center">
                         <p className="text-sm text-muted-foreground mb-2">{t('dashboard.competitionStartsIn')}</p>
                         <CountdownTimer targetDate={data.settings.competitionStartTime} size="lg" className="justify-center" onComplete={onCountdownComplete} />
@@ -577,7 +578,7 @@ export default function DashboardPage() {
                           ? t('dashboard.competitionCompleted')
                           : !canStartReading() && data?.submission?.readingStartAt
                           ? t('dashboard.alreadyStartedReading')
-                          : !canStartReading() && data?.settings?.competitionStartTime && new Date() < new Date(data.settings.competitionStartTime)
+                          : !canStartReading() && data?.settings?.competitionStartTime && new Date() < safeDate(data.settings.competitionStartTime)
                           ? t('dashboard.competitionNotStarted')
                           : !canStartReading() && isCompetitionEnded()
                           ? t('dashboard.competitionEnded')

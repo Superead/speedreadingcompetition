@@ -9,6 +9,7 @@ import { DurationTimer } from "@/components/countdown-timer";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { safeDate } from "@/lib/date";
 import {
   Clock, BookOpen, CheckCircle, AlertTriangle, Loader2,
   ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Columns,
@@ -161,7 +162,7 @@ export default function CompetitionReadPage() {
     )
       return;
 
-    const competitionEnd = new Date(data.settings.competitionEndTime);
+    const competitionEnd = safeDate(data.settings.competitionEndTime);
     const now = new Date();
 
     const triggerAutoFinish = () => {
@@ -398,7 +399,7 @@ export default function CompetitionReadPage() {
   // ---- Active reading view ----
 
   const readingStart = data.submission?.readingStartAt
-    ? new Date(data.submission.readingStartAt)
+    ? safeDate(data.submission.readingStartAt)
     : new Date();
   const durationMinutes = data.settings?.readingDurationMinutes || 30;
   const endTime = new Date(
@@ -595,7 +596,8 @@ export default function CompetitionReadPage() {
                 ref={containerRef}
                 className="flex gap-0 rounded-lg shadow-lg border overflow-hidden"
                 style={{
-                  height: "calc(100vh - 240px)",
+                  height: pageHeight > 0 ? `${pageHeight}px` : "calc(100vh - 240px)",
+                  maxHeight: "calc(100vh - 240px)",
                   width: "min(900px, calc(100vw - 120px))",
                   flexShrink: 0,
                 }}
@@ -638,7 +640,8 @@ export default function CompetitionReadPage() {
                 ref={containerRef}
                 style={{
                   overflow: "hidden",
-                  height: "calc(100vh - 240px)",
+                  height: pageHeight > 0 ? `${pageHeight}px` : "calc(100vh - 240px)",
+                  maxHeight: "calc(100vh - 240px)",
                   width: "min(600px, calc(100vw - 120px))",
                   flexShrink: 0,
                 }}

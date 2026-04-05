@@ -2206,8 +2206,9 @@ export async function registerRoutes(
       if (competition.registrationStartTime && now < new Date(competition.registrationStartTime)) {
         return res.status(400).json({ error: "Registration has not started yet" });
       }
-      if (competition.registrationEndTime && now > new Date(competition.registrationEndTime)) {
-        return res.status(400).json({ error: "Registration has ended" });
+      // Allow registration until competition ends (not just registration end time)
+      if (competition.competitionEndTime && now > new Date(competition.competitionEndTime)) {
+        return res.status(400).json({ error: "Competition has ended" });
       }
 
       const existing = await storage.getRegistration(competition.id, user.id);

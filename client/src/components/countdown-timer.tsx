@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { safeDate } from "@/lib/date";
 
 interface CountdownTimerProps {
   targetDate: Date | string | null;
@@ -44,7 +45,7 @@ export function CountdownTimer({
   useEffect(() => {
     if (!targetDate) return;
 
-    const target = typeof targetDate === "string" ? new Date(targetDate) : targetDate;
+    const target = typeof targetDate === "string" ? safeDate(targetDate) : targetDate;
     let completed = false;
 
     const updateTimer = () => {
@@ -125,7 +126,7 @@ export function DurationTimer({
   className?: string;
   size?: "sm" | "md" | "lg";
 }) {
-  const start = typeof startTime === "string" ? new Date(startTime) : startTime;
+  const start = typeof startTime === "string" ? safeDate(startTime) : startTime;
   const endTime = new Date(start.getTime() + durationMinutes * 60 * 1000);
   
   return (
