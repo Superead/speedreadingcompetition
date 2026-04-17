@@ -524,8 +524,9 @@ function SubmissionsTab({
   const [filterLanguage, setFilterLanguage] = useState<string>("all");
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
 
-  const { data: submissions, isLoading } = useQuery<(Submission & { user?: User; competitionId?: string })[]>({
+  const { data: submissions, isLoading, refetch: refetchSubmissions } = useQuery<(Submission & { user?: User; competitionId?: string })[]>({
     queryKey: [`${apiPrefix}/submissions`],
+    staleTime: 30_000, // refresh every 30s
   });
 
   const { data: competitions } = useQuery<Competition[]>({
@@ -614,6 +615,9 @@ function SubmissionsTab({
           </div>
         )}
         <Badge variant="secondary">{filteredSubmissions?.length || 0} submissions</Badge>
+        <Button variant="outline" size="sm" onClick={() => refetchSubmissions()}>
+          <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+        </Button>
       </div>
 
       <Card>
