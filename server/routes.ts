@@ -87,6 +87,7 @@ const questionCreateSchema = z.object({
   prompt: z.string().min(1, "Prompt is required"),
   optionsJson: z.string().nullable().optional(),
   correctAnswer: z.string().nullable().optional(),
+  maxPoints: z.number().int().min(1).max(10).optional(),
 });
 
 const questionUpdateSchema = z.object({
@@ -2014,6 +2015,7 @@ export async function registerRoutes(
         optionsJson: data.optionsJson || null,
         correctAnswer: data.correctAnswer || null,
         language,
+        maxPoints: data.type === "TEXT" ? (data.maxPoints ?? 5) : 1,
       });
       res.json(question);
     } catch (error) {
@@ -2032,6 +2034,7 @@ export async function registerRoutes(
         prompt: data.prompt,
         optionsJson: data.optionsJson || null,
         correctAnswer: data.correctAnswer || null,
+        maxPoints: data.type === "TEXT" ? (data.maxPoints ?? 5) : 1,
       });
       if (!question) {
         return res.status(404).json({ error: "Question not found" });

@@ -60,6 +60,7 @@ function QuestionsTab() {
     optionC: "",
     optionD: "",
     correctAnswer: "",
+    maxPoints: 5,
   });
 
   const { data: competitions, isLoading: competitionsLoading } = useQuery<any[]>({
@@ -122,6 +123,7 @@ function QuestionsTab() {
         optionsJson: options,
         correctAnswer: data.type === "MCQ" ? data.correctAnswer : null,
         language: selectedLanguage,
+        maxPoints: data.type === "TEXT" ? data.maxPoints : 1,
       };
 
       if (editingQuestion) {
@@ -168,6 +170,7 @@ function QuestionsTab() {
       optionC: "",
       optionD: "",
       correctAnswer: "",
+      maxPoints: 5,
     });
     setEditingQuestion(null);
   };
@@ -183,6 +186,7 @@ function QuestionsTab() {
       optionC: options.C || "",
       optionD: options.D || "",
       correctAnswer: question.correctAnswer || "",
+      maxPoints: question.maxPoints || 5,
     });
     setIsDialogOpen(true);
   };
@@ -290,6 +294,22 @@ function QuestionsTab() {
                   data-testid="textarea-question-prompt"
                 />
               </div>
+              {questionForm.type === "TEXT" && (
+                <div className="space-y-2">
+                  <Label>Max Points (0–{questionForm.maxPoints})</Label>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={10}
+                      className="w-24"
+                      value={questionForm.maxPoints}
+                      onChange={(e) => setQuestionForm({ ...questionForm, maxPoints: Math.max(1, Math.min(10, parseInt(e.target.value) || 1)) })}
+                    />
+                    <span className="text-sm text-muted-foreground">Teachers score each answer from 0 to this value</span>
+                  </div>
+                </div>
+              )}
               {questionForm.type === "MCQ" && (
                 <>
                   <div className="grid grid-cols-2 gap-4">
