@@ -12,7 +12,7 @@ import express from "express";
 import {
   registerSchema, loginSchema, adminLoginSchema, answers,
   testimonials, banners, subscribers, socialShares, siteStats,
-  passwordResetTokens, competitionRegistrations,
+  passwordResetTokens, competitionRegistrations, users,
   type Category, type User
 } from "@shared/schema";
 import { z } from "zod";
@@ -349,6 +349,17 @@ export async function registerRoutes(
       }
       console.error("Registration error:", error);
       res.status(500).json({ error: "Registration failed" });
+    }
+  });
+
+  // Get current user from token (used by partner SSO redirect)
+  app.get("/api/auth/me", authMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user" });
     }
   });
 
@@ -2855,6 +2866,127 @@ export async function registerRoutes(
       res.json(row);
     } catch (error) {
       res.status(500).json({ error: "Failed to upsert site stat" });
+    }
+  });
+
+  // ==================== PARTNER SSO API ====================
+
+  const PARTNER_API_KEY = process.env.PARTNER_API_KEY || "";
+
+  function partnerKeyMiddleware(req: Request, res: Response, next: NextFunction) {
+    if (!PARTNER_API_KEY) {
+      return res.status(503).json({ error: "Partner API not configured" });
+    }
+    const key = req.headers["x-partner-key"] as string;
+    if (!key || key !== PARTNER_API_KEY) {
+      return res.status(401).json({ error: "Invalid or missing X-Partner-Key header" });
+    }
+    next();
+  }
+
+  /**
+   * POST /api/partner/auth
+   * Find or create a student account linked to a partner user ID.
+   * Returns a JWT token and a redirect URL the partner can use to land the user
+   * on the dashboard already authenticated.
+   */
+  app.post("/api/partner/auth", partnerKeyMiddleware, async (req: Request, res: Response) => {
+    try {
+      const {
+        partnerUserId,
+        name,
+        surname,
+        email,
+        language,
+        category,
+        country,
+        city,
+      } = req.body;
+
+      if (!partnerUserId) {
+        return res.status(400).json({ error: "partnerUserId is required" });
+      }
+      if (!name || !surname) {
+        return res.status(400).json({ error: "name and surname are required" });
+      }
+
+      // Look up existing account by partnerUserId
+      let [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.partnerUserId, String(partnerUserId)));
+
+      if (!user) {
+        // Generate unique affiliate code
+        let affiliateCode = generateAffiliateCode();
+        while (await storage.getUserByAffiliateCode(affiliateCode)) {
+          affiliateCode = generateAffiliateCode();
+        }
+
+        // Determine category from request or default to "adult"
+        const validCategories = ["kid", "teen", "adult"];
+        const userCategory = validCategories.includes(category) ? category : "adult";
+
+        // Create new student account (no password needed — SSO-only account)
+        const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
+
+        [user] = await db
+          .insert(users)
+          .values({
+            name: String(name),
+            surname: String(surname),
+            email: email ? String(email) : null,
+            role: "STUDENT",
+            category: userCategory,
+            preferredLanguage: language || "en",
+            country: country ? String(country) : null,
+            city: city ? String(city) : null,
+            affiliateCode,
+            passwordHash,
+            partnerUserId: String(partnerUserId),
+          } as any)
+          .returning();
+      } else {
+        // Update name/email/language if provided (partner may send updated info)
+        const updates: any = {};
+        if (name) updates.name = String(name);
+        if (surname) updates.surname = String(surname);
+        if (email) updates.email = String(email);
+        if (language) updates.preferredLanguage = String(language);
+        if (country) updates.country = String(country);
+        if (city) updates.city = String(city);
+
+        if (Object.keys(updates).length > 0) {
+          [user] = await db
+            .update(users)
+            .set(updates)
+            .where(eq(users.partnerUserId, String(partnerUserId)))
+            .returning();
+        }
+      }
+
+      // Issue a short-lived JWT (1h) for the redirect URL
+      const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "1h" });
+
+      const appBaseUrl = process.env.APP_BASE_URL || "https://app.testmyreadingspeed.com";
+      const redirectUrl = `${appBaseUrl}/auth?token=${token}`;
+
+      res.json({
+        token,
+        redirectUrl,
+        user: {
+          id: user.id,
+          name: user.name,
+          surname: user.surname,
+          email: user.email,
+          category: user.category,
+          role: user.role,
+        },
+        isNewUser: !user.createdAt || (Date.now() - new Date(user.createdAt).getTime()) < 5000,
+      });
+    } catch (error) {
+      console.error("Partner auth error:", error);
+      res.status(500).json({ error: "Failed to authenticate partner user" });
     }
   });
 

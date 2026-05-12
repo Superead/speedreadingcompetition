@@ -43,12 +43,14 @@ export const users = pgTable("users", {
   referralPoints: integer("referral_points").default(0),
   preferredLanguage: text("preferred_language").default("tr"),
   teacherLanguages: text("teacher_languages"),
+  partnerUserId: text("partner_user_id").unique(),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("users_email_idx").on(table.email),
   index("users_category_idx").on(table.category),
   index("users_affiliate_code_idx").on(table.affiliateCode),
   index("users_referrer_id_idx").on(table.referrerId),
+  index("users_partner_user_id_idx").on(table.partnerUserId),
 ]);
 
 export const passwordResetTokens = pgTable("password_reset_tokens", {

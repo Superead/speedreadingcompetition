@@ -17,6 +17,7 @@ import AdminDashboard from "@/pages/admin";
 import TeacherDashboard from "@/pages/teacher";
 import ForgotPasswordPage from "@/pages/forgot-password";
 import ResetPasswordPage from "@/pages/reset-password";
+import AuthRedirectPage from "@/pages/auth-redirect";
 import { useEffect } from "react";
 import "@/lib/i18n";
 
@@ -66,6 +67,7 @@ function Router() {
       <Route path="/admin-login" component={AdminLoginPage} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
+      <Route path="/auth" component={AuthRedirectPage} />
       <Route path="/dashboard">
         {() => <ProtectedRoute component={DashboardPage} />}
       </Route>
