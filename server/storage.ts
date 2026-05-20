@@ -735,8 +735,9 @@ export class DatabaseStorage implements IStorage {
     const competition = await this.getCompetition(id);
     if (!competition) return undefined;
 
-    // Get first available book (default language)
-    const book = await this.getCompetitionBook(id);
+    // Get first available book (any language)
+    const allBooks = await this.getCompetitionBooks(id);
+    const book = allBooks[0];
     const questionsResult = await db.select().from(competitionQuestions).where(eq(competitionQuestions.competitionId, id));
     const registrationsResult = await db.select().from(competitionRegistrations).where(eq(competitionRegistrations.competitionId, id));
 

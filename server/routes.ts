@@ -1837,11 +1837,12 @@ export async function registerRoutes(
       if (!details) {
         return res.status(404).json({ error: "Competition not found" });
       }
+      const allBooks = await storage.getCompetitionBooks(req.params.id);
       const issues: string[] = [];
       if (!details.competitionStartTime) issues.push("Set a competition start time");
       if (!details.competitionEndTime) issues.push("Set a competition end time");
       if ((details.questionCount || 0) === 0) issues.push("Add at least one question");
-      if (!details.book) issues.push("Add a book/reading material");
+      if (allBooks.length === 0) issues.push("Add a book/reading material");
       if (issues.length > 0) {
         return res.status(400).json({ error: "Cannot publish: " + issues.join(". ") + "." });
       }
