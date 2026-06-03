@@ -70,6 +70,14 @@ app.use((req, res, next) => {
   } catch (e) {
     // Column may already exist — safe to ignore
   }
+  // Add new language enum values (safe to run multiple times)
+  for (const lang of ["ro", "es", "pt", "ar", "it"]) {
+    try {
+      await db.execute(sql.raw(`ALTER TYPE language ADD VALUE IF NOT EXISTS '${lang}'`));
+    } catch (e) {
+      // Already exists — safe to ignore
+    }
+  }
 
   await registerRoutes(httpServer, app);
 

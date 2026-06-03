@@ -10,7 +10,7 @@ export const genderEnum = pgEnum("gender", ["male", "female", "other"]);
 export const questionTypeEnum = pgEnum("question_type", ["MCQ", "TEXT"]);
 export const submissionStatusEnum = pgEnum("submission_status", ["SUBMITTED", "REVIEWED", "FINALIZED"]);
 export const competitionStatusEnum = pgEnum("competition_status", ["DRAFT", "ACTIVE", "CLOSED"]);
-export const languageEnum = pgEnum("language", ["tr", "en", "de", "pl", "fr", "vi", "hi"]);
+export const languageEnum = pgEnum("language", ["tr", "en", "de", "pl", "fr", "vi", "hi", "ro", "es", "pt", "ar", "it"]);
 
 export const SUPPORTED_LANGUAGES = [
   { code: "tr", name: "Türkçe", flag: "🇹🇷" },
@@ -20,9 +20,14 @@ export const SUPPORTED_LANGUAGES = [
   { code: "fr", name: "Français", flag: "🇫🇷" },
   { code: "vi", name: "Tiếng Việt", flag: "🇻🇳" },
   { code: "hi", name: "हिन्दी", flag: "🇮🇳" },
+  { code: "ro", name: "Română", flag: "🇷🇴" },
+  { code: "es", name: "Español", flag: "🇪🇸" },
+  { code: "pt", name: "Português", flag: "🇵🇹" },
+  { code: "ar", name: "العربية", flag: "🇸🇦" },
+  { code: "it", name: "Italiano", flag: "🇮🇹" },
 ] as const;
 
-export type Language = "tr" | "en" | "de" | "pl" | "fr" | "vi" | "hi";
+export type Language = "tr" | "en" | "de" | "pl" | "fr" | "vi" | "hi" | "ro" | "es" | "pt" | "ar" | "it";
 
 // ─── Core Tables ─────────────────────────────────────────────────────────────
 export const users = pgTable("users", {
