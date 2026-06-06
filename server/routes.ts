@@ -581,7 +581,7 @@ export async function registerRoutes(
     try {
       const user = req.user!;
       const { language } = req.body;
-      const validLanguages = ["tr", "en", "de", "pl", "fr", "vi", "hi"];
+      const validLanguages = ["tr", "en", "de", "pl", "fr", "vi", "hi", "ro", "es", "pt", "ar", "it"];
       if (!language || !validLanguages.includes(language)) {
         return res.status(400).json({ error: "Invalid language" });
       }
