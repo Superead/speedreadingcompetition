@@ -12,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Trash2, Loader2, Edit, Eye, EyeOff } from "lucide-react";
+import { Plus, Trash2, Loader2, Edit, Eye, EyeOff, RotateCcw } from "lucide-react";
 import type { Category, Competition, CompetitionBook } from "@shared/schema";
 import { SUPPORTED_LANGUAGES } from "@shared/schema";
 import {
@@ -172,6 +172,20 @@ function CompetitionsTab() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to close", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const resetCompetitionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/admin/competitions/${id}/reset`, {});
+      return res.json();
+    },
+    onSuccess: async (data: any) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/competitions"] });
+      toast({ title: "Competition reset", description: `${data.submissionsDeleted || 0} submission(s) cleared. Students can start fresh.` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to reset", description: error.message, variant: "destructive" });
     },
   });
 
@@ -585,6 +599,27 @@ function CompetitionsTab() {
                               <AlertDialogFooter>
                                 <AlertDialogCancel data-testid="button-cancel-close-competition">Cancel</AlertDialogCancel>
                                 <AlertDialogAction onClick={() => closeMutation.mutate(comp.id)} data-testid="button-confirm-close-competition">Close Competition</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                        {comp.status === "ACTIVE" && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" title="Reset competition" data-testid={`button-reset-competition-${comp.id}`}>
+                                <RotateCcw className="h-4 w-4 text-amber-600" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Reset Competition?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will clear ALL submissions and answers for "{comp.title}" so every student starts from zero. The book and questions stay intact. Students just need to refresh, pick their language, and start again. Use this when students started with the wrong language.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => resetCompetitionMutation.mutate(comp.id)}>Reset to Zero</AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>

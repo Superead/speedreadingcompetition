@@ -1869,6 +1869,22 @@ export async function registerRoutes(
     }
   });
 
+  // Reset competition: wipe all submissions/answers/registrations so everyone
+  // starts fresh (keeps books and questions). Used when students need to retry.
+  app.post("/api/admin/competitions/:id/reset", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const competition = await storage.getCompetition(req.params.id);
+      if (!competition) {
+        return res.status(404).json({ error: "Competition not found" });
+      }
+      const result = await storage.resetCompetition(req.params.id);
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error("Reset competition error:", error);
+      res.status(500).json({ error: "Failed to reset competition" });
+    }
+  });
+
   // Publish competition results
   app.put("/api/admin/competitions/:id/results/publish", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
     try {

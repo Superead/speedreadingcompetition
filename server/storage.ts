@@ -121,6 +121,7 @@ export interface IStorage {
   createCompetition(data: InsertCompetition): Promise<Competition>;
   updateCompetition(id: string, data: Partial<InsertCompetition>): Promise<Competition | undefined>;
   deleteCompetition(id: string): Promise<void>;
+  resetCompetition(id: string): Promise<{ submissionsDeleted: number }>;
   publishCompetition(id: string): Promise<Competition | undefined>;
   closeCompetition(id: string): Promise<Competition | undefined>;
   publishCompetitionResults(id: string): Promise<Competition | undefined>;
@@ -780,6 +781,23 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCompetition(id: string): Promise<void> {
     await db.delete(competitions).where(eq(competitions.id, id));
+  }
+
+  // Reset a competition: delete all submissions, answers and registrations
+  // for this competition so students can start over (keeps books/questions).
+  async resetCompetition(id: string): Promise<{ submissionsDeleted: number }> {
+    const subs = await db.select({ id: submissions.id })
+      .from(submissions)
+      .where(eq(submissions.competitionId, id));
+    const subIds = subs.map(s => s.id);
+
+    if (subIds.length > 0) {
+      await db.delete(answers).where(inArray(answers.submissionId, subIds));
+    }
+    await db.delete(submissions).where(eq(submissions.competitionId, id));
+    await db.delete(competitionRegistrations).where(eq(competitionRegistrations.competitionId, id));
+
+    return { submissionsDeleted: subIds.length };
   }
 
   async publishCompetition(id: string): Promise<Competition | undefined> {
