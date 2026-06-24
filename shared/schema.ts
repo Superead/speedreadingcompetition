@@ -372,6 +372,7 @@ export const registerSchema = z.object({
   country: z.string().optional(),
   referralCode: z.string().optional(),
   category: z.enum(["kid", "teen", "adult"]),
+  preferredLanguage: z.string().optional(),
 });
 
 export const loginSchema = z.object({
