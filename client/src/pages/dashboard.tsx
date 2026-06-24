@@ -25,12 +25,19 @@ import { changeLanguage } from "@/lib/i18n";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const LANG_FLAGS: Record<string, string> = {
   tr: "🇹🇷", en: "🇬🇧", de: "🇩🇪", pl: "🇵🇱", fr: "🇫🇷", vi: "🇻🇳", hi: "🇮🇳",
+  ro: "🇷🇴", es: "🇪🇸", pt: "🇵🇹", ar: "🇸🇦", it: "🇮🇹",
 };
 const LANG_NAMES: Record<string, string> = {
   tr: "Türkçe", en: "English", de: "Deutsch", pl: "Polski", fr: "Français", vi: "Tiếng Việt", hi: "हिन्दी",
+  ro: "Română", es: "Español", pt: "Português", ar: "العربية", it: "Italiano",
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -588,9 +595,34 @@ export default function DashboardPage() {
                     {data?.submission?.answerEndAt ? (
                       <Badge variant="secondary" className="shrink-0">{t('dashboard.completed')}</Badge>
                     ) : canStartReading() ? (
-                      <Link href="/competition/read">
-                        <Button data-testid="button-start-reading">{t('dashboard.startReading')}</Button>
-                      </Link>
+                      (() => {
+                        const compLang = (user as any).preferredLanguage || "tr";
+                        const flag = LANG_FLAGS[compLang] || "🌐";
+                        const langName = LANG_NAMES[compLang] || compLang;
+                        return (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button data-testid="button-start-reading">{t('dashboard.startReading')}</Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  {t('dashboard.confirmLangTitle', { flag, language: langName })}
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  {t('dashboard.confirmLangBody', { flag, language: langName })}
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>{t('dashboard.confirmLangChange')}</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => navigate("/competition/read")}>
+                                  {t('dashboard.confirmLangStart', { flag, language: langName })}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        );
+                      })()
                     ) : (
                       <Button disabled data-testid="button-start-reading">{t('dashboard.startReading')}</Button>
                     )}
