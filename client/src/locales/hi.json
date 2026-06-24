@@ -213,10 +213,12 @@
     "scheduleNotAnnounced": "प्रतियोगिता का कार्यक्रम अभी घोषित नहीं हुआ",
     "competitionCompleted": "प्रतियोगिता पूर्ण",
     "alreadyStartedReading": "आपने पहले ही पढ़ना शुरू कर दिया है",
-    "competitionNotStarted": "प्रतियोगिता अभी शुरू नहीं हुई",
-    "readyForCompetition": "प्रतियोगिता के लिए तैयार",
     "noResultsYet": "अभी कोई परिणाम नहीं",
-    "comp": "समझ"
+    "comp": "समझ",
+    "confirmLangTitle": "{{flag}} {{language}} में प्रतिस्पर्धा करें?",
+    "confirmLangBody": "आपकी पुस्तक और प्रश्न {{flag}} {{language}} में होंगे। शुरू करने के बाद इसे बदला नहीं जा सकता। यदि यह आपकी भाषा नहीं है, तो „भाषा बदलें\" चुनें और पहले सही भाषा चुनें।",
+    "confirmLangChange": "भाषा बदलें",
+    "confirmLangStart": "हाँ, {{flag}} {{language}} में शुरू करें"
   },
   "reading": {
     "title": "पठन चरण",
@@ -234,10 +236,6 @@
     "noBook": "कोई किताब उपलब्ध नहीं",
     "noBookDesc": "इस प्रतियोगिता की किताब अभी अपलोड नहीं हुई है।",
     "startReading": "पढ़ना शुरू करें",
-    "confirmLangTitle": "{{flag}} {{language}} में प्रतिस्पर्धा करें?",
-    "confirmLangBody": "आपकी पुस्तक और प्रश्न {{flag}} {{language}} में होंगे। शुरू करने के बाद इसे बदला नहीं जा सकता। यदि यह आपकी भाषा नहीं है, तो „भाषा बदलें\" चुनें और पहले सही भाषा चुनें।",
-    "confirmLangChange": "भाषा बदलें",
-    "confirmLangStart": "हाँ, {{flag}} {{language}} में शुरू करें",
     "starting": "शुरू हो रहा है...",
     "youHaveMinutes": "आपके पास पढ़ने के लिए {{minutes}} मिनट हैं।",
     "instructions": "निर्देश",

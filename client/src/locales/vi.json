@@ -213,10 +213,12 @@
     "scheduleNotAnnounced": "Lịch thi chưa được công bố",
     "competitionCompleted": "Cuộc thi đã hoàn thành",
     "alreadyStartedReading": "Bạn đã bắt đầu đọc",
-    "competitionNotStarted": "Cuộc thi chưa bắt đầu",
-    "readyForCompetition": "Sẵn sàng thi",
     "noResultsYet": "Chưa có kết quả",
-    "comp": "Hiểu"
+    "comp": "Hiểu",
+    "confirmLangTitle": "Thi đấu bằng {{flag}} {{language}}?",
+    "confirmLangBody": "Sách và câu hỏi của bạn sẽ bằng {{flag}} {{language}}. Không thể thay đổi sau khi bắt đầu. Nếu đây không phải ngôn ngữ của bạn, hãy chọn „Đổi ngôn ngữ\" và chọn đúng ngôn ngữ trước.",
+    "confirmLangChange": "Đổi ngôn ngữ",
+    "confirmLangStart": "Có, bắt đầu bằng {{flag}} {{language}}"
   },
   "reading": {
     "title": "Giai đoạn đọc",
@@ -234,10 +236,6 @@
     "noBook": "Không có sách",
     "noBookDesc": "Sách cho cuộc thi này chưa được tải lên.",
     "startReading": "Bắt đầu đọc",
-    "confirmLangTitle": "Thi đấu bằng {{flag}} {{language}}?",
-    "confirmLangBody": "Sách và câu hỏi của bạn sẽ bằng {{flag}} {{language}}. Không thể thay đổi sau khi bắt đầu. Nếu đây không phải ngôn ngữ của bạn, hãy chọn „Đổi ngôn ngữ\" và chọn đúng ngôn ngữ trước.",
-    "confirmLangChange": "Đổi ngôn ngữ",
-    "confirmLangStart": "Có, bắt đầu bằng {{flag}} {{language}}",
     "starting": "Đang bắt đầu...",
     "youHaveMinutes": "Bạn có {{minutes}} phút để đọc.",
     "instructions": "Hướng dẫn",

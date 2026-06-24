@@ -213,10 +213,12 @@
     "scheduleNotAnnounced": "Le calendrier du concours n'a pas encore été annoncé",
     "competitionCompleted": "Concours terminé",
     "alreadyStartedReading": "Vous avez déjà commencé à lire",
-    "competitionNotStarted": "Le concours n'a pas encore commencé",
-    "readyForCompetition": "Prêt pour le concours",
     "noResultsYet": "Pas encore de résultats",
-    "comp": "Comp."
+    "comp": "Comp.",
+    "confirmLangTitle": "Concourir en {{flag}} {{language}} ?",
+    "confirmLangBody": "Votre livre et vos questions seront en {{flag}} {{language}}. Cela ne peut pas être modifié une fois commencé. Si ce n'est pas votre langue, choisissez « Changer de langue » et sélectionnez d'abord la bonne.",
+    "confirmLangChange": "Changer de langue",
+    "confirmLangStart": "Oui, commencer en {{flag}} {{language}}"
   },
   "reading": {
     "title": "Phase de lecture",
@@ -234,10 +236,6 @@
     "noBook": "Aucun livre disponible",
     "noBookDesc": "Le livre pour ce concours n'a pas encore été téléchargé.",
     "startReading": "Commencer la lecture",
-    "confirmLangTitle": "Concourir en {{flag}} {{language}} ?",
-    "confirmLangBody": "Votre livre et vos questions seront en {{flag}} {{language}}. Cela ne peut pas être modifié une fois commencé. Si ce n'est pas votre langue, choisissez « Changer de langue » et sélectionnez d'abord la bonne.",
-    "confirmLangChange": "Changer de langue",
-    "confirmLangStart": "Oui, commencer en {{flag}} {{language}}",
     "starting": "Démarrage...",
     "youHaveMinutes": "Vous avez {{minutes}} minutes pour lire.",
     "instructions": "Instructions",

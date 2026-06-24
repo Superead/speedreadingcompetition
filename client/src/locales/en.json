@@ -214,10 +214,12 @@
     "scheduleNotAnnounced": "Competition schedule not yet announced",
     "competitionCompleted": "Competition completed",
     "alreadyStartedReading": "You have already started reading",
-    "competitionNotStarted": "Competition has not started yet",
-    "readyForCompetition": "Ready for the competition",
     "noResultsYet": "No results yet",
-    "comp": "Comp"
+    "comp": "Comp",
+    "confirmLangTitle": "Compete in {{flag}} {{language}}?",
+    "confirmLangBody": "Your book and questions will be in {{flag}} {{language}}. This cannot be changed once you start. If this is not your language, choose \"Change Language\" and pick the correct one first.",
+    "confirmLangChange": "Change Language",
+    "confirmLangStart": "Yes, start in {{flag}} {{language}}"
   },
   "reading": {
     "title": "Reading Phase",
@@ -235,10 +237,6 @@
     "noBook": "No Book Available",
     "noBookDesc": "The book for this competition has not been uploaded yet.",
     "startReading": "Start Reading",
-    "confirmLangTitle": "Compete in {{flag}} {{language}}?",
-    "confirmLangBody": "Your book and questions will be in {{flag}} {{language}}. This cannot be changed once you start. If this is not your language, choose \"Change Language\" and pick the correct one first.",
-    "confirmLangChange": "Change Language",
-    "confirmLangStart": "Yes, start in {{flag}} {{language}}",
     "starting": "Starting...",
     "youHaveMinutes": "You have {{minutes}} minutes to read.",
     "instructions": "Instructions",

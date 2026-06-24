@@ -214,10 +214,12 @@
     "scheduleNotAnnounced": "Yarışma takvimi henüz açıklanmadı",
     "competitionCompleted": "Yarışma tamamlandı",
     "alreadyStartedReading": "Okumaya zaten başladınız",
-    "competitionNotStarted": "Yarışma henüz başlamadı",
-    "readyForCompetition": "Yarışmaya hazır",
     "noResultsYet": "Henüz sonuç yok",
-    "comp": "Anlama"
+    "comp": "Anlama",
+    "confirmLangTitle": "{{flag}} {{language}} ile mi yarışacaksınız?",
+    "confirmLangBody": "Kitabınız ve sorularınız {{flag}} {{language}} dilinde olacak. Başladıktan sonra değiştirilemez. Diliniz bu değilse \"Dili Değiştir\"e tıklayıp önce doğru dili seçin.",
+    "confirmLangChange": "Dili Değiştir",
+    "confirmLangStart": "Evet, {{flag}} {{language}} ile başla"
   },
   "reading": {
     "title": "Okuma Aşaması",
@@ -235,10 +237,6 @@
     "noBook": "Kitap Bulunamadı",
     "noBookDesc": "Bu yarışma için kitap henüz yüklenmemiş.",
     "startReading": "Okumaya Başla",
-    "confirmLangTitle": "{{flag}} {{language}} ile mi yarışacaksınız?",
-    "confirmLangBody": "Kitabınız ve sorularınız {{flag}} {{language}} dilinde olacak. Başladıktan sonra değiştirilemez. Diliniz bu değilse \"Dili Değiştir\"e tıklayıp önce doğru dili seçin.",
-    "confirmLangChange": "Dili Değiştir",
-    "confirmLangStart": "Evet, {{flag}} {{language}} ile başla",
     "starting": "Başlatılıyor...",
     "youHaveMinutes": "Okumak için {{minutes}} dakikanız var.",
     "instructions": "Talimatlar",

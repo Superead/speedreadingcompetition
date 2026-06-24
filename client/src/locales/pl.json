@@ -213,10 +213,12 @@
     "scheduleNotAnnounced": "Harmonogram konkursu jeszcze nie ogłoszony",
     "competitionCompleted": "Konkurs ukończony",
     "alreadyStartedReading": "Już rozpocząłeś czytanie",
-    "competitionNotStarted": "Konkurs jeszcze się nie rozpoczął",
-    "readyForCompetition": "Gotowy do konkursu",
     "noResultsYet": "Brak wyników",
-    "comp": "Rozum."
+    "comp": "Rozum.",
+    "confirmLangTitle": "Rywalizować w {{flag}} {{language}}?",
+    "confirmLangBody": "Twoja książka i pytania będą w języku {{flag}} {{language}}. Nie można tego zmienić po rozpoczęciu. Jeśli to nie jest Twój język, wybierz „Zmień język\" i najpierw wybierz właściwy.",
+    "confirmLangChange": "Zmień język",
+    "confirmLangStart": "Tak, zacznij w {{flag}} {{language}}"
   },
   "reading": {
     "title": "Faza czytania",
@@ -234,10 +236,6 @@
     "noBook": "Brak dostępnej książki",
     "noBookDesc": "Książka do tego konkursu nie została jeszcze przesłana.",
     "startReading": "Rozpocznij czytanie",
-    "confirmLangTitle": "Rywalizować w {{flag}} {{language}}?",
-    "confirmLangBody": "Twoja książka i pytania będą w języku {{flag}} {{language}}. Nie można tego zmienić po rozpoczęciu. Jeśli to nie jest Twój język, wybierz „Zmień język\" i najpierw wybierz właściwy.",
-    "confirmLangChange": "Zmień język",
-    "confirmLangStart": "Tak, zacznij w {{flag}} {{language}}",
     "starting": "Rozpoczynanie...",
     "youHaveMinutes": "Masz {{minutes}} minut na czytanie.",
     "instructions": "Instrukcje",
