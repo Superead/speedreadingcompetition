@@ -358,43 +358,36 @@ export class DatabaseStorage implements IStorage {
     return submission || undefined;
   }
 
-  async getAllSubmissions(): Promise<SubmissionWithUser[]> {
-    const allSubmissions = await db.select().from(submissions);
-    const result: SubmissionWithUser[] = [];
-
-    for (const sub of allSubmissions) {
-      const user = await this.getUser(sub.userId);
-      result.push({
+  // Attach user info to a list of submissions with a single bulk user query
+  // (avoids N+1 queries that make the submissions/reviewer pages hang).
+  private async attachUsers(subs: any[]): Promise<SubmissionWithUser[]> {
+    if (subs.length === 0) return [];
+    const userIds = Array.from(new Set(subs.map(s => s.userId)));
+    const userRows = await db.select().from(users).where(inArray(users.id, userIds));
+    const userMap = new Map(userRows.map(u => [u.id, u]));
+    return subs.map(sub => {
+      const user = userMap.get(sub.userId);
+      return {
         ...sub,
         userName: user ? `${user.name} ${user.surname}` : "Unknown",
         userEmail: user?.email || null,
         userCity: user?.city || null,
         userCountry: user?.country || null,
-      });
-    }
+      };
+    });
+  }
 
-    return result;
+  async getAllSubmissions(): Promise<SubmissionWithUser[]> {
+    const allSubmissions = await db.select().from(submissions);
+    return this.attachUsers(allSubmissions);
   }
 
   // @ts-ignore - drizzle dual-module type resolution issue
   async getSubmissionsByCategory(category: Category, status?: SubmissionStatus): Promise<SubmissionWithUser[]> {
-    let query = db.select().from(submissions).where(eq(submissions.category, category));
     const allSubmissions = status
       ? await db.select().from(submissions).where(and(eq(submissions.category, category), eq(submissions.status, status)))
       : await db.select().from(submissions).where(eq(submissions.category, category));
-
-    const result: SubmissionWithUser[] = [];
-    for (const sub of allSubmissions) {
-      const user = await this.getUser(sub.userId);
-      result.push({
-        ...sub,
-        userName: user ? `${user.name} ${user.surname}` : "Unknown",
-        userEmail: user?.email || null,
-        userCity: user?.city || null,
-        userCountry: user?.country || null,
-      });
-    }
-    return result;
+    return this.attachUsers(allSubmissions);
   }
 
   async getSubmissionWithDetails(id: string): Promise<SubmissionWithDetails | undefined> {
@@ -941,19 +934,7 @@ export class DatabaseStorage implements IStorage {
   async getCompetitionSubmissions(competitionId: string): Promise<SubmissionWithUser[]> {
     const allSubmissions = await db.select().from(submissions)
       .where(eq(submissions.competitionId, competitionId));
-
-    const result: SubmissionWithUser[] = [];
-    for (const sub of allSubmissions) {
-      const user = await this.getUser(sub.userId);
-      result.push({
-        ...sub,
-        userName: user ? `${user.name} ${user.surname}` : "Unknown",
-        userEmail: user?.email || null,
-        userCity: user?.city || null,
-        userCountry: user?.country || null,
-      });
-    }
-    return result;
+    return this.attachUsers(allSubmissions);
   }
 
   async getCompetitionLeaderboard(competitionId: string): Promise<LeaderboardEntry[]> {
