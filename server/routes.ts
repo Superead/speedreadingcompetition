@@ -1191,14 +1191,24 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Email, password, name, and surname are required" });
       }
 
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // If a user with this email already exists (e.g. registered as a student),
+      // promote/convert that account to a TEACHER with the given password and
+      // languages instead of rejecting — otherwise the email is stuck forever.
       const existing = await storage.getUserByEmail(email);
       if (existing) {
-        return res.status(409).json({ error: "A user with this email already exists" });
+        const updated = await storage.updateUser(existing.id, {
+          passwordHash: hashedPassword,
+          name,
+          surname,
+          role: "TEACHER" as any,
+          teacherLanguages: teacherLanguages || null,
+        });
+        return res.status(200).json({ ...updated, promoted: true });
       }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
       const id = crypto.randomUUID();
-
       const teacher = await storage.createUser({
         id,
         email,
