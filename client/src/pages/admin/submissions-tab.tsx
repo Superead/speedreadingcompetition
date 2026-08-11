@@ -685,6 +685,7 @@ function SubmissionsTab({
                     <TableCell>{submission.autoScore ?? "-"}</TableCell>
                     <TableCell>
                       <Input
+                        key={`manual-${submission.id}-${submission.manualScore ?? ""}`}
                         type="number"
                         className="w-16"
                         placeholder="-"
