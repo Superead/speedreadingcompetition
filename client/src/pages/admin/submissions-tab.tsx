@@ -203,7 +203,7 @@ function SubmissionDetailDialog({ submissionId, onClose, apiPrefix = "/api/admin
   }, [details]);
 
   // Compute live scores using the same unified formula as the server:
-  // comprehensionScore = (totalScored / totalMax) * 10 if ratio >= 0.4
+  // comprehensionScore = totalScored / totalMax (0–1, shown as %) if ratio >= 0.4, else 0
   // finalScore = comprehensionScore × readingSpeedWPM
   const liveManualScore = Object.values(answerScores).reduce((sum, score) => sum + score, 0);
 
@@ -217,7 +217,8 @@ function SubmissionDetailDialog({ submissionId, onClose, apiPrefix = "/api/admin
     const totalMax = mcqTotal + textMax;
     if (totalMax === 0) return 0;
     const ratio = totalScored / totalMax;
-    return ratio >= 0.4 ? ratio * 10 : 0;
+    // comprehension is the raw ratio (0–1), shown as a percentage; below 40% counts as 0
+    return ratio >= 0.4 ? ratio : 0;
   })();
   const wpm = details?.readingSpeedWPM || 0;
   const liveFinalScore = Math.round(liveComprehension * wpm * 100) / 100;
@@ -383,9 +384,9 @@ function SubmissionDetailDialog({ submissionId, onClose, apiPrefix = "/api/admin
               </div>
               <div className="text-center p-3 bg-muted rounded-md">
                 <p className="text-muted-foreground">Comprehension</p>
-                <p className="text-xl font-bold">{Math.round(liveComprehension * 100) / 100}</p>
+                <p className="text-xl font-bold">{Math.round(liveComprehension * 100)}%</p>
                 <p className="text-xs text-muted-foreground">
-                  (scored / max) × 10
+                  scored / max
                 </p>
               </div>
               <div className="text-center p-3 bg-muted rounded-md">

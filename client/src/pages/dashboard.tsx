@@ -703,7 +703,7 @@ export default function DashboardPage() {
                               <p className="text-[10px] sm:text-xs text-muted-foreground">
                                 {entry.readingSpeedWPM ? `${Math.round(entry.readingSpeedWPM)} WPM` : ""}
                                 {entry.readingSpeedWPM && entry.comprehensionScore ? " | " : ""}
-                                {entry.comprehensionScore ? `${t('dashboard.comp')}: ${entry.comprehensionScore.toFixed(1)}` : ""}
+                                {entry.comprehensionScore ? `${t('dashboard.comp')}: ${Math.round(entry.comprehensionScore * 100)}%` : ""}
                               </p>
                             </div>
                           </div>

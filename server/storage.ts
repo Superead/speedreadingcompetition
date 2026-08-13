@@ -631,8 +631,10 @@ export class DatabaseStorage implements IStorage {
       const totalScored = mcqCorrectCount + textCorrectPoints;
       const totalMax = mcqTotalCount + textMaxPoints;
       const ratio = totalMax > 0 ? totalScored / totalMax : 0;
+      // comprehensionScore is the raw ratio (0–1), shown as a percentage in the UI.
+      // Below the 40% threshold it counts as 0.
       if (ratio >= 0.4) {
-        comprehensionScore = ratio * 10;
+        comprehensionScore = ratio;
       } else {
         comprehensionScore = 0;
       }

@@ -288,8 +288,8 @@ export default function CompetitionResultsPage() {
               />
               {submission.comprehensionScore != null && (
                 <ScoreRing
-                  value={submission.comprehensionScore}
-                  max={10}
+                  value={Math.round(submission.comprehensionScore * 100)}
+                  max={100}
                   label={t('results.comprehensionLabel')}
                   color="text-purple-500"
                 />
@@ -302,7 +302,7 @@ export default function CompetitionResultsPage() {
                   {t('results.finalScoreFormula')}
                 </p>
                 <p className="text-xl font-bold text-primary mt-1">
-                  {submission.comprehensionScore?.toFixed(1)} x {Math.round(submission.readingSpeedWPM || 0)} = {Math.round(submission.finalScore).toLocaleString()}
+                  {Math.round((submission.comprehensionScore || 0) * 100)}% x {Math.round(submission.readingSpeedWPM || 0)} = {(Math.round(submission.finalScore * 100) / 100).toLocaleString()}
                 </p>
               </div>
             )}
