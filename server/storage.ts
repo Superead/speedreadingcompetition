@@ -37,6 +37,7 @@ export interface LeaderboardEntry {
   city: string | null;
   country: string | null;
   finalScore: number;
+  wabaScore: number;
   readingSpeedWPM: number | null;
   comprehensionScore: number | null;
   readingSeconds: number | null;
@@ -429,6 +430,7 @@ export class DatabaseStorage implements IStorage {
     const allSubmissions = await db.select().from(submissions)
       .where(eq(submissions.category, category))
       .orderBy(
+        desc(submissions.wabaScore),
         desc(submissions.finalScore),
         asc(submissions.readingSeconds),
         asc(submissions.answerSeconds),
@@ -448,6 +450,7 @@ export class DatabaseStorage implements IStorage {
           city: user.city,
           country: user.country,
           finalScore: sub.finalScore || 0,
+          wabaScore: (sub as any).wabaScore || 0,
           readingSpeedWPM: sub.readingSpeedWPM,
           comprehensionScore: sub.comprehensionScore,
           readingSeconds: sub.readingSeconds,
@@ -465,6 +468,7 @@ export class DatabaseStorage implements IStorage {
     const allSubmissions = await db.select().from(submissions)
       .where(eq(submissions.category, category))
       .orderBy(
+        desc(submissions.wabaScore),
         desc(submissions.finalScore),
         asc(submissions.readingSeconds),
         asc(submissions.answerSeconds),
@@ -484,6 +488,7 @@ export class DatabaseStorage implements IStorage {
           city: user.city,
           country: user.country,
           finalScore: sub.finalScore || 0,
+          wabaScore: (sub as any).wabaScore || 0,
           readingSpeedWPM: sub.readingSpeedWPM,
           comprehensionScore: sub.comprehensionScore,
           readingSeconds: sub.readingSeconds,
@@ -501,6 +506,7 @@ export class DatabaseStorage implements IStorage {
     const allSubmissions = await db.select().from(submissions)
       .where(eq(submissions.competitionId, competitionId))
       .orderBy(
+        desc(submissions.wabaScore),
         desc(submissions.finalScore),
         asc(submissions.readingSeconds),
         asc(submissions.answerSeconds),
@@ -520,6 +526,7 @@ export class DatabaseStorage implements IStorage {
           city: user.city,
           country: user.country,
           finalScore: sub.finalScore || 0,
+          wabaScore: (sub as any).wabaScore || 0,
           readingSpeedWPM: sub.readingSpeedWPM,
           comprehensionScore: sub.comprehensionScore,
           readingSeconds: sub.readingSeconds,
@@ -630,17 +637,17 @@ export class DatabaseStorage implements IStorage {
       // TEXT: points scored out of maxPoints
       const totalScored = mcqCorrectCount + textCorrectPoints;
       const totalMax = mcqTotalCount + textMaxPoints;
-      const ratio = totalMax > 0 ? totalScored / totalMax : 0;
       // comprehensionScore is the raw ratio (0–1), shown as a percentage in the UI.
-      // Below the 40% threshold it counts as 0.
-      if (ratio >= 0.4) {
-        comprehensionScore = ratio;
-      } else {
-        comprehensionScore = 0;
-      }
+      comprehensionScore = totalMax > 0 ? totalScored / totalMax : 0;
     }
 
+    // Final score rewards speed × comprehension.
     calculatedFinalScore = comprehensionScore * readingSpeedWPM;
+
+    // WABA score applies a comprehension-based bonus/penalty around a 40% baseline:
+    //   WABA = final × (1 + (comprehension% − 40)/100) = final × (0.6 + ratio)
+    // Above 40% comprehension → bonus; below 40% → penalty.
+    const wabaScore = calculatedFinalScore * (0.6 + comprehensionScore);
 
     const manualScore = textCorrectPoints;
 
@@ -653,8 +660,9 @@ export class DatabaseStorage implements IStorage {
       readingSpeedWPM: Math.round(readingSpeedWPM * 100) / 100,
       comprehensionScore: Math.round(comprehensionScore * 100) / 100,
       finalScore: Math.round(calculatedFinalScore * 100) / 100,
+      wabaScore: Math.round(wabaScore * 100) / 100,
       updatedAt: new Date(),
-    });
+    } as any);
   }
 
   async getAnswers(submissionId: string): Promise<Answer[]> {
@@ -943,6 +951,7 @@ export class DatabaseStorage implements IStorage {
     const allSubmissions = await db.select().from(submissions)
       .where(eq(submissions.competitionId, competitionId))
       .orderBy(
+        desc(submissions.wabaScore),
         desc(submissions.finalScore),
         asc(submissions.readingSeconds),
         asc(submissions.answerSeconds),
@@ -962,6 +971,7 @@ export class DatabaseStorage implements IStorage {
           city: user.city,
           country: user.country,
           finalScore: sub.finalScore || 0,
+          wabaScore: (sub as any).wabaScore || 0,
           readingSpeedWPM: sub.readingSpeedWPM,
           comprehensionScore: sub.comprehensionScore,
           readingSeconds: sub.readingSeconds,
@@ -979,6 +989,7 @@ export class DatabaseStorage implements IStorage {
     const allSubmissions = await db.select().from(submissions)
       .where(eq(submissions.competitionId, competitionId))
       .orderBy(
+        desc(submissions.wabaScore),
         desc(submissions.finalScore),
         asc(submissions.readingSeconds),
         asc(submissions.answerSeconds),
@@ -998,6 +1009,7 @@ export class DatabaseStorage implements IStorage {
           city: user.city,
           country: user.country,
           finalScore: sub.finalScore || 0,
+          wabaScore: (sub as any).wabaScore || 0,
           readingSpeedWPM: sub.readingSpeedWPM,
           comprehensionScore: sub.comprehensionScore,
           readingSeconds: sub.readingSeconds,

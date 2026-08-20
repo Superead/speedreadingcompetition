@@ -47,6 +47,7 @@ interface LeaderboardEntry {
   city: string | null;
   country: string | null;
   finalScore: number;
+  wabaScore: number;
   readingSpeedWPM: number | null;
   comprehensionScore: number | null;
   readingSeconds: number | null;
@@ -697,8 +698,8 @@ export default function DashboardPage() {
                               </div>
                             </div>
                             <div className="text-right shrink-0 ml-2">
-                              <p className="font-bold text-sm sm:text-base" data-testid={`text-score-${entry.rank}`}>
-                                {Math.round(entry.finalScore).toLocaleString()}
+                              <p className="font-bold text-sm sm:text-base text-primary" data-testid={`text-score-${entry.rank}`}>
+                                {Math.round(entry.wabaScore ?? entry.finalScore).toLocaleString()}
                               </p>
                               <p className="text-[10px] sm:text-xs text-muted-foreground">
                                 {entry.readingSpeedWPM ? `${Math.round(entry.readingSpeedWPM)} WPM` : ""}

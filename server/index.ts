@@ -67,6 +67,7 @@ app.use((req, res, next) => {
   try {
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS partner_user_id TEXT UNIQUE`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS users_partner_user_id_idx ON users(partner_user_id)`);
+    await db.execute(sql`ALTER TABLE submissions ADD COLUMN IF NOT EXISTS waba_score real DEFAULT 0`);
   } catch (e) {
     // Column may already exist — safe to ignore
   }

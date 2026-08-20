@@ -29,6 +29,7 @@ interface LeaderboardEntry {
   city: string;
   country: string;
   finalScore: number;
+  wabaScore: number;
   readingSpeedWPM: number | null;
   comprehensionScore: number | null;
 }
@@ -616,7 +617,7 @@ function ResultsLeaderboard({ entries }: { entries: LeaderboardEntry[] }) {
             )}
           </div>
           <div className="text-right shrink-0">
-            <p className="font-semibold tabular-nums">{Math.round(entry.finalScore).toLocaleString()}</p>
+            <p className="font-semibold tabular-nums">{Math.round(entry.wabaScore ?? entry.finalScore).toLocaleString()}</p>
             <p className="text-xs text-muted-foreground">{t('landing.points')}</p>
           </div>
         </div>

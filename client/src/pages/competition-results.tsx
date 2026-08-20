@@ -31,6 +31,7 @@ interface LeaderboardEntry {
   city: string | null;
   country: string | null;
   finalScore: number;
+  wabaScore: number;
   readingSpeedWPM: number | null;
   comprehensionScore: number | null;
 }
@@ -49,6 +50,7 @@ interface ResultsData {
     readingSpeedWPM: number | null;
     comprehensionScore: number | null;
     finalScore: number | null;
+    wabaScore: number | null;
     mcqCorrectCount: number | null;
     mcqWrongCount: number | null;
     mcqTotalCount: number | null;
@@ -204,10 +206,10 @@ export default function CompetitionResultsPage() {
                     </p>
                   </div>
                 </div>
-                {submission.finalScore != null && (
+                {(submission.wabaScore ?? submission.finalScore) != null && (
                   <div className="text-center px-4 sm:px-6 py-3 bg-white/60 dark:bg-black/20 rounded-xl">
-                    <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider font-medium">{t('results.finalScore')}</p>
-                    <p className="text-2xl sm:text-3xl font-black text-primary">{Math.round(submission.finalScore).toLocaleString()}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider font-medium">WABA Score</p>
+                    <p className="text-2xl sm:text-3xl font-black text-primary">{Math.round(submission.wabaScore ?? submission.finalScore ?? 0).toLocaleString()}</p>
                   </div>
                 )}
               </div>
@@ -301,9 +303,17 @@ export default function CompetitionResultsPage() {
                 <p className="text-sm text-muted-foreground">
                   {t('results.finalScoreFormula')}
                 </p>
-                <p className="text-xl font-bold text-primary mt-1">
+                <p className="text-lg font-semibold mt-1">
                   {Math.round((submission.comprehensionScore || 0) * 100)}% x {Math.round(submission.readingSpeedWPM || 0)} = {(Math.round(submission.finalScore * 100) / 100).toLocaleString()}
                 </p>
+                {submission.wabaScore != null && (
+                  <div className="mt-4">
+                    <p className="text-sm text-muted-foreground">WABA Score</p>
+                    <p className="text-3xl font-bold text-primary">
+                      {(Math.round(submission.wabaScore * 100) / 100).toLocaleString()}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
@@ -446,7 +456,7 @@ export default function CompetitionResultsPage() {
                           </div>
                         </div>
                         <div className="text-right shrink-0 ml-2">
-                          <p className="font-bold text-sm sm:text-base">{Math.round(entry.finalScore).toLocaleString()}</p>
+                          <p className="font-bold text-sm sm:text-base text-primary">{Math.round(entry.wabaScore ?? entry.finalScore).toLocaleString()}</p>
                           <p className="text-[10px] sm:text-xs text-muted-foreground">
                             {entry.readingSpeedWPM ? `${Math.round(entry.readingSpeedWPM)} WPM` : ""}
                           </p>

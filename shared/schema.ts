@@ -179,6 +179,7 @@ export const submissions = pgTable("submissions", {
   autoScore: integer("auto_score").default(0),
   manualScore: integer("manual_score").default(0),
   finalScore: real("final_score").default(0),
+  wabaScore: real("waba_score").default(0),
   readingSpeedWPM: real("reading_speed_wpm").default(0),
   comprehensionScore: real("comprehension_score").default(0),
   status: submissionStatusEnum("status").default("SUBMITTED"),

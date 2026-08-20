@@ -203,8 +203,9 @@ function SubmissionDetailDialog({ submissionId, onClose, apiPrefix = "/api/admin
   }, [details]);
 
   // Compute live scores using the same unified formula as the server:
-  // comprehensionScore = totalScored / totalMax (0–1, shown as %) if ratio >= 0.4, else 0
-  // finalScore = comprehensionScore × readingSpeedWPM
+  // comprehension = totalScored / totalMax (0–1, shown as %)
+  // final = comprehension × WPM
+  // WABA = final × (0.6 + comprehension)   [+bonus above 40%, −penalty below]
   const liveManualScore = Object.values(answerScores).reduce((sum, score) => sum + score, 0);
 
   const liveComprehension = (() => {
@@ -216,12 +217,12 @@ function SubmissionDetailDialog({ submissionId, onClose, apiPrefix = "/api/admin
     const totalScored = mcqCorrect + liveManualScore;
     const totalMax = mcqTotal + textMax;
     if (totalMax === 0) return 0;
-    const ratio = totalScored / totalMax;
-    // comprehension is the raw ratio (0–1), shown as a percentage; below 40% counts as 0
-    return ratio >= 0.4 ? ratio : 0;
+    return totalScored / totalMax;
   })();
   const wpm = details?.readingSpeedWPM || 0;
-  const liveFinalScore = Math.round(liveComprehension * wpm * 100) / 100;
+  const liveFinalRaw = liveComprehension * wpm;
+  const liveFinalScore = Math.round(liveFinalRaw * 100) / 100;
+  const liveWabaScore = Math.round(liveFinalRaw * (0.6 + liveComprehension) * 100) / 100;
 
   const scoreMutation = useMutation({
     mutationFn: async (manualScore: number) => {
@@ -377,7 +378,7 @@ function SubmissionDetailDialog({ submissionId, onClose, apiPrefix = "/api/admin
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mt-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mt-4">
               <div className="text-center p-3 bg-muted rounded-md">
                 <p className="text-muted-foreground">Reading Speed</p>
                 <p className="text-xl font-bold">{Math.round(wpm)} WPM</p>
@@ -391,9 +392,16 @@ function SubmissionDetailDialog({ submissionId, onClose, apiPrefix = "/api/admin
               </div>
               <div className="text-center p-3 bg-muted rounded-md">
                 <p className="text-muted-foreground">Final Score</p>
-                <p className="text-xl font-bold text-primary">{liveFinalScore}</p>
+                <p className="text-xl font-bold">{liveFinalScore}</p>
                 <p className="text-xs text-muted-foreground">
                   comprehension × WPM
+                </p>
+              </div>
+              <div className="text-center p-3 bg-primary/10 rounded-md border border-primary/30">
+                <p className="text-muted-foreground">WABA Score</p>
+                <p className="text-xl font-bold text-primary">{liveWabaScore}</p>
+                <p className="text-xs text-muted-foreground">
+                  final × (0.6 + comp)
                 </p>
               </div>
             </div>
@@ -624,7 +632,7 @@ function SubmissionsTab({
       <Card>
         <CardContent className="pt-6">
           <div className="overflow-auto max-h-[500px]">
-            <div className="min-w-[1100px]">
+            <div className="min-w-[1200px]">
             <Table className="text-sm">
               <TableHeader>
                 <TableRow>
@@ -639,6 +647,7 @@ function SubmissionsTab({
                   <TableHead className="w-[50px]">Auto</TableHead>
                   <TableHead className="w-[60px]">Manual</TableHead>
                   <TableHead className="w-[70px]">Final</TableHead>
+                  <TableHead className="w-[80px] text-primary font-semibold">WABA</TableHead>
                   {showReviewerColumn && <TableHead>Reviewed By</TableHead>}
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -701,6 +710,7 @@ function SubmissionsTab({
                       />
                     </TableCell>
                     <TableCell className="font-bold">{submission.finalScore ?? "-"}</TableCell>
+                    <TableCell className="font-bold text-primary">{(submission as any).wabaScore ?? "-"}</TableCell>
                     {showReviewerColumn && (
                       <TableCell className="text-xs">
                         {(submission as any).reviewedByName ? (
