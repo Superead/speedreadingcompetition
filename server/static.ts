@@ -25,14 +25,9 @@ export function serveStatic(app: Express) {
   const landingPath = path.resolve(distPath, "landing.html");
   const hasLanding = fs.existsSync(landingPath);
 
-  // Canonical: send www.<marketing> to the bare apex (SEO).
-  app.use((req, res, next) => {
-    const host = (req.headers.host || "").toLowerCase().split(":")[0];
-    if (host.startsWith("www.testmyreadingspeed.com")) {
-      return res.redirect(301, "https://testmyreadingspeed.com" + req.originalUrl);
-    }
-    next();
-  });
+  // Both apex and www serve the landing; the page's <link rel="canonical">
+  // points search engines at the bare apex. (No server-side www->apex
+  // redirect, so a GoDaddy apex-forward can't create a redirect loop.)
 
   // robots.txt — real file (previously fell through to the SPA shell)
   app.get("/robots.txt", (req, res) => {
