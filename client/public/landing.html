@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%E2%9A%A1%3C/text%3E%3C/svg%3E">
+<meta charset="utf-8">
+<title>Test My Reading Speed</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Find out how fast you read in 60 seconds — free, no sign-up. Get your words-per-minute and comprehension score, then compete in the global WABA reading championship.">
+<meta name="keywords" content="reading speed test, words per minute, wpm test, how fast do i read, speed reading, reading comprehension test, reading competition">
+<link rel="canonical" href="https://testmyreadingspeed.com/">
+<meta name="robots" content="index, follow">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Test My Reading Speed">
+<meta property="og:title" content="How fast do you read? Test My Reading Speed">
+<meta property="og:description" content="Take the free 60-second reading speed test. Get your WPM + comprehension score, then challenge your friends and compete worldwide.">
+<meta property="og:url" content="https://testmyreadingspeed.com/">
+<meta property="og:image" content="https://testmyreadingspeed.com/og-cover.png">
+<meta property="og:locale" content="en_US">
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="How fast do you read? Test My Reading Speed">
+<meta name="twitter:description" content="Free 60-second reading speed test — get your WPM + comprehension, then compete worldwide.">
+<meta name="twitter:image" content="https://testmyreadingspeed.com/og-cover.png">
+
+<!-- Structured data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebApplication",
+      "name": "Test My Reading Speed",
+      "url": "https://testmyreadingspeed.com/",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Web",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "description": "Free reading speed test measuring words per minute and comprehension, plus a global gamified reading competition."
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How is reading speed measured?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Reading speed is measured in words per minute (WPM). We time how long you take to read a passage, divide the word count by the minutes, and combine it with a short comprehension check so speed alone can't inflate your score." }
+        },
+        {
+          "@type": "Question",
+          "name": "What is a good reading speed?",
+          "acceptedAnswer": { "@type": "Answer", "text": "The average adult reads 200–250 WPM. 300+ is fast, and competitive speed readers exceed 500 WPM while keeping comprehension high." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is the reading speed test free?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. The test is completely free with no sign-up. Creating an account is only needed to join competitions and track your progress." }
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;700;900&family=Hanken+Grotesk:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=JetBrains+Mono:wght@500;600&display=swap">
+
+<style>
+  :root {
+    --ink: #15161c;
+    --ink-2: #3b3e4b;
+    --muted: #6c6f80;
+    --paper: #ffffff;
+    --paper-2: #f3f4f8;
+    --paper-3: #eceef4;
+    --line: #e3e5ee;
+    --accent: #4a46f5;
+    --accent-ink: #3a36e0;
+    --accent-tint: #ecebff;
+    --gold: #f5a300;
+    --gold-tint: #fff2d6;
+    --green: #12a866;
+    --green-tint: #dcf5ea;
+    --hero-bg: #0f1018;
+    --hero-bg-2: #16182a;
+    --hero-ink: #f5f5fa;
+    --hero-muted: #a1a4be;
+    --hero-line: #2a2c42;
+    --radius: 16px;
+    --radius-sm: 10px;
+    --shadow: 0 2px 4px rgba(15,16,24,.04), 0 10px 34px rgba(15,16,24,.08);
+    --shadow-lg: 0 8px 20px rgba(15,16,24,.10), 0 30px 60px rgba(15,16,24,.16);
+    --measure: 60ch;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Hanken Grotesk", system-ui, -apple-system, sans-serif;
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3 { font-family: "Schibsted Grotesk", system-ui, sans-serif; letter-spacing: -.02em; text-wrap: balance; margin: 0; }
+  p { margin: 0; }
+  a { color: inherit; }
+
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+  .eyebrow {
+    font-family: "JetBrains Mono", monospace;
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+  }
+
+  .container { width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 clamp(18px, 4vw, 40px); }
+  .narrow { max-width: 720px; }
+
+  /* ---- Buttons ---- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+    font-family: "Hanken Grotesk", sans-serif; font-weight: 600; font-size: 1rem;
+    padding: 14px 26px; border-radius: 100px; border: 1.5px solid transparent;
+    cursor: pointer; text-decoration: none; transition: transform .12s ease, box-shadow .2s ease, background .2s ease;
+    white-space: nowrap;
+  }
+  .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+  .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 6px 18px rgba(74,70,245,.32); }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(74,70,245,.42); }
+  .btn-ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+  .btn-ghost:hover { border-color: var(--ink); }
+  .btn-lg { padding: 17px 34px; font-size: 1.08rem; }
+  .btn-onlight { background: #fff; color: var(--hero-bg); }
+  .btn-onlight:hover { transform: translateY(-2px); }
+
+  /* ---- Nav ---- */
+  header.nav {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(15,16,24,.82); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--hero-line);
+  }
+  .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 66px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: "Schibsted Grotesk", sans-serif; font-weight: 900; font-size: 1.18rem; color: var(--hero-ink); letter-spacing: -.03em; text-decoration: none; }
+  .brand .spark { width: 26px; height: 26px; border-radius: 8px; background: var(--accent); display: grid; place-items: center; color: #fff; font-size: 15px; box-shadow: 0 4px 12px rgba(74,70,245,.5); }
+  .nav-links { display: flex; align-items: center; gap: 8px; }
+  .nav-links a.textlink { color: var(--hero-muted); text-decoration: none; font-weight: 500; font-size: .95rem; padding: 8px 14px; border-radius: 8px; transition: color .15s; }
+  .nav-links a.textlink:hover { color: var(--hero-ink); }
+  .nav-links .btn-primary { padding: 10px 20px; font-size: .95rem; }
+  @media (max-width: 620px) { .nav-links a.textlink { display: none; } }
+
+  /* ---- Hero ---- */
+  .hero {
+    background:
+      radial-gradient(60% 90% at 82% -10%, rgba(74,70,245,.26), transparent 60%),
+      radial-gradient(50% 70% at 8% 8%, rgba(245,163,0,.10), transparent 55%),
+      linear-gradient(180deg, var(--hero-bg), var(--hero-bg-2));
+    color: var(--hero-ink);
+    padding: clamp(40px, 7vw, 84px) 0 clamp(48px, 7vw, 96px);
+    position: relative; overflow: hidden;
+  }
+  .hero-grid { display: grid; grid-template-columns: 1fr; gap: clamp(30px, 5vw, 56px); }
+  @media (min-width: 940px) { .hero-grid { grid-template-columns: 1.02fr 1fr; align-items: center; } }
+
+  .hero .eyebrow { color: #b9b7ff; margin-bottom: 20px; display: inline-flex; align-items: center; gap: 9px; }
+  .hero .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(18,168,102,.2); }
+  .hero h1 { font-size: clamp(2.5rem, 6.4vw, 4.3rem); font-weight: 900; line-height: .98; color: #fff; }
+  .hero h1 .hl { color: transparent; background: linear-gradient(100deg, #8f8bff, #4a46f5 55%, #f5a300); -webkit-background-clip: text; background-clip: text; }
+  .hero-sub { margin-top: 22px; font-size: 1.18rem; color: var(--hero-muted); max-width: 46ch; }
+  .hero-meta { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 22px 30px; }
+  .hero-meta .m { display: flex; flex-direction: column; gap: 2px; }
+  .hero-meta .m .n { font-family: "Schibsted Grotesk", sans-serif; font-weight: 900; font-size: 1.5rem; color: #fff; font-variant-numeric: tabular-nums; }
+  .hero-meta .m .l { font-size: .82rem; color: var(--hero-muted); }
+
+  /* ---- Test card ---- */
+  .test-card {
+    background: #fff; color: var(--ink); border-radius: 20px;
+    box-shadow: var(--shadow-lg); overflow: hidden; position: relative;
+    min-height: 420px; display: flex; flex-direction: column;
+  }
+  .test-top { display: flex; align-items: center; justify-content: space-between; padding: 16px 22px; border-bottom: 1px solid var(--line); background: var(--paper-2); }
+  .test-top .tt-title { font-family: "JetBrains Mono", monospace; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .test-top .timer { font-family: "JetBrains Mono", monospace; font-weight: 600; font-size: .92rem; color: var(--accent-ink); background: var(--accent-tint); padding: 4px 12px; border-radius: 100px; font-variant-numeric: tabular-nums; }
+  .test-body { padding: 24px 26px; flex: 1; display: flex; flex-direction: column; }
+
+  .stage { display: none; flex: 1; flex-direction: column; }
+  .stage.active { display: flex; animation: fade .35s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .stage.active { animation: none; } }
+
+  /* intro stage */
+  .intro-illo { font-size: 2.2rem; }
+  #stage-intro h3 { font-size: 1.5rem; margin: 14px 0 8px; }
+  #stage-intro p { color: var(--muted); font-size: .98rem; max-width: 42ch; }
+  .steps { list-style: none; padding: 0; margin: 20px 0 24px; display: flex; flex-direction: column; gap: 10px; }
+  .steps li { display: flex; align-items: center; gap: 12px; font-size: .95rem; }
+  .steps li .sn { flex: none; width: 26px; height: 26px; border-radius: 8px; background: var(--accent-tint); color: var(--accent-ink); display: grid; place-items: center; font-family: "JetBrains Mono", monospace; font-weight: 600; font-size: .82rem; }
+
+  /* reading stage */
+  .passage { font-family: "Newsreader", Georgia, serif; font-size: 1.24rem; line-height: 1.62; color: #23252f; max-width: 54ch; }
+  .passage p + p { margin-top: 1em; }
+  .read-actions { margin-top: 22px; display: flex; align-items: center; gap: 14px; }
+  .read-hint { font-size: .84rem; color: var(--muted); }
+
+  /* quiz stage */
+  #stage-quiz h3 { font-size: 1.3rem; margin-bottom: 4px; }
+  #stage-quiz .qsub { color: var(--muted); font-size: .92rem; margin-bottom: 18px; }
+  .quiz-q { margin-bottom: 18px; }
+  .quiz-q .qp { font-weight: 600; margin-bottom: 10px; font-size: 1rem; }
+  .opts { display: grid; gap: 8px; }
+  .opt { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border: 1.5px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; font-size: .95rem; transition: border-color .12s, background .12s; }
+  .opt:hover { border-color: var(--accent); }
+  .opt input { accent-color: var(--accent); width: 17px; height: 17px; flex: none; }
+  .opt.sel { border-color: var(--accent); background: var(--accent-tint); }
+
+  /* result stage */
+  #stage-result { align-items: center; text-align: center; justify-content: center; }
+  .wpm-big { font-family: "Schibsted Grotesk", sans-serif; font-weight: 900; font-size: clamp(4rem, 16vw, 6.2rem); line-height: .9; color: var(--accent); font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+  .wpm-unit { font-size: 1rem; font-family: "JetBrains Mono", monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+  .result-line { margin-top: 16px; font-size: 1.05rem; max-width: 34ch; }
+  .result-line b { color: var(--ink); }
+  .result-stats { display: flex; gap: 10px; margin-top: 20px; width: 100%; }
+  .rstat { flex: 1; background: var(--paper-2); border-radius: var(--radius-sm); padding: 12px 8px; }
+  .rstat .rn { font-family: "Schibsted Grotesk", sans-serif; font-weight: 900; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+  .rstat .rl { font-size: .72rem; color: var(--muted); font-family: "JetBrains Mono", monospace; letter-spacing: .05em; text-transform: uppercase; margin-top: 2px; }
+  .rstat.green .rn { color: var(--green); }
+  .rstat.gold .rn { color: var(--gold); }
+  .result-actions { margin-top: 22px; display: flex; flex-direction: column; gap: 10px; width: 100%; }
+  .share-row { display: flex; gap: 8px; justify-content: center; }
+  .share-btn { width: 42px; height: 42px; border-radius: 12px; border: 1.5px solid var(--line); background: #fff; display: grid; place-items: center; cursor: pointer; transition: transform .12s, border-color .12s; color: var(--ink); }
+  .share-btn:hover { transform: translateY(-2px); border-color: var(--ink); }
+  .restart { background: none; border: none; color: var(--muted); font-family: inherit; font-size: .88rem; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding: 4px; }
+  .restart:hover { color: var(--ink); }
+
+  /* ---- Generic section ---- */
+  section { padding: clamp(56px, 9vw, 104px) 0; }
+  .sec-eyebrow { color: var(--accent-ink); margin-bottom: 16px; }
+  .sec-h { font-size: clamp(1.8rem, 4.4vw, 2.9rem); font-weight: 900; line-height: 1.04; }
+  .sec-lead { margin-top: 18px; font-size: 1.14rem; color: var(--muted); max-width: var(--measure); }
+  .center { text-align: center; }
+  .center .sec-lead { margin-left: auto; margin-right: auto; }
+
+  /* how it works */
+  .steps-3 { display: grid; gap: 20px; margin-top: 48px; grid-template-columns: 1fr; }
+  @media (min-width: 760px) { .steps-3 { grid-template-columns: repeat(3, 1fr); } }
+  .step-card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 28px 26px; box-shadow: var(--shadow); position: relative; }
+  .step-card .sk-n { font-family: "JetBrains Mono", monospace; font-weight: 600; font-size: .82rem; color: var(--accent); }
+  .step-card h3 { font-size: 1.28rem; margin: 14px 0 8px; }
+  .step-card p { color: var(--muted); font-size: .97rem; }
+  .step-card .sk-ic { font-size: 1.7rem; position: absolute; top: 24px; right: 26px; }
+
+  /* what is it — gamification */
+  .band { background: var(--hero-bg); color: var(--hero-ink); }
+  .band .sec-eyebrow { color: #b9b7ff; }
+  .band .sec-h { color: #fff; }
+  .band .sec-lead { color: var(--hero-muted); }
+  .feature-grid { display: grid; gap: 16px; margin-top: 48px; grid-template-columns: 1fr; }
+  @media (min-width: 680px) { .feature-grid { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 940px) { .feature-grid { grid-template-columns: repeat(3, 1fr); } }
+  .feature { background: rgba(255,255,255,.04); border: 1px solid var(--hero-line); border-radius: var(--radius); padding: 24px; transition: border-color .2s, transform .2s; }
+  .feature:hover { border-color: var(--accent); transform: translateY(-3px); }
+  .feature .fic { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-size: 22px; margin-bottom: 16px; }
+  .feature h3 { font-size: 1.18rem; color: #fff; margin-bottom: 7px; }
+  .feature p { color: var(--hero-muted); font-size: .95rem; }
+  .fic.a { background: rgba(74,70,245,.2); }
+  .fic.b { background: rgba(245,163,0,.16); }
+  .fic.c { background: rgba(18,168,102,.16); }
+
+  /* benefits */
+  .benefit-row { display: grid; grid-template-columns: 1fr; gap: 40px; margin-top: 48px; align-items: center; }
+  @media (min-width: 860px) { .benefit-row { grid-template-columns: 1.1fr .9fr; } }
+  .benefit-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 20px; }
+  .benefit-list li { display: flex; gap: 15px; }
+  .benefit-list .bic { flex: none; width: 32px; height: 32px; border-radius: 9px; background: var(--green-tint); color: var(--green); display: grid; place-items: center; font-weight: 700; }
+  .benefit-list h3 { font-size: 1.12rem; margin-bottom: 3px; }
+  .benefit-list p { color: var(--muted); font-size: .96rem; }
+  .formula-card { background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 30px; }
+  .formula-card .fc-label { font-family: "JetBrains Mono", monospace; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .formula-card .fc-eq { font-family: "Schibsted Grotesk", sans-serif; font-weight: 700; font-size: 1.5rem; margin: 14px 0; line-height: 1.3; }
+  .formula-card .fc-eq .op { color: var(--muted); }
+  .formula-card .fc-eq .speed { color: var(--accent); }
+  .formula-card .fc-eq .comp { color: var(--green); }
+  .formula-card p { color: var(--muted); font-size: .95rem; }
+
+  /* comparison */
+  .compare-wrap { overflow-x: auto; margin-top: 46px; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+  table.compare { border-collapse: collapse; width: 100%; min-width: 760px; background: #fff; }
+  .compare th, .compare td { text-align: left; padding: 16px 18px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .compare thead th { font-family: "JetBrains Mono", monospace; font-size: .68rem; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); font-weight: 600; background: var(--paper-2); white-space: nowrap; }
+  .compare tbody tr:last-child td { border-bottom: none; }
+  .compare .app { font-weight: 700; font-size: 1.02rem; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 9px; line-height: 1.25; min-width: 150px; }
+  .compare th:first-child, .compare td:first-child { width: 210px; }
+  .compare .how, .compare .bestfor { color: var(--ink-2); font-size: .93rem; }
+  .compare .mark { text-align: center; font-weight: 700; font-size: 1.15rem; }
+  .compare .mark.yes { color: var(--green); }
+  .compare .mark.no { color: #c3c6d2; }
+  .compare .mark.part { color: var(--gold); font-size: .82rem; font-family: "JetBrains Mono", monospace; font-weight: 600; }
+  .compare .row-us { background: linear-gradient(90deg, var(--accent-tint), #f6f5ff); }
+  .compare .row-us td { border-bottom-color: #d9d7ff; }
+  .compare .row-us .app { color: var(--accent-ink); }
+  .compare .badge-us { font-family: "JetBrains Mono", monospace; font-size: .58rem; font-weight: 600; letter-spacing: .08em; background: var(--accent); color: #fff; padding: 3px 7px; border-radius: 6px; text-transform: uppercase; }
+  .compare-legend { margin-top: 16px; font-size: .82rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 18px; }
+  .compare-legend b { color: var(--ink); font-weight: 600; }
+  .compare-note { margin-top: 8px; font-size: .78rem; color: var(--muted); }
+
+  /* categories */
+  .cats { display: grid; gap: 16px; margin-top: 44px; grid-template-columns: 1fr; }
+  @media (min-width: 720px) { .cats { grid-template-columns: repeat(3, 1fr); } }
+  .cat { border: 1px solid var(--line); border-radius: var(--radius); padding: 26px; text-align: center; background: #fff; box-shadow: var(--shadow); }
+  .cat .cemoji { font-size: 2rem; }
+  .cat h3 { font-size: 1.24rem; margin: 12px 0 4px; }
+  .cat .cage { font-family: "JetBrains Mono", monospace; font-size: .8rem; color: var(--accent-ink); }
+
+  /* CTA */
+  .cta {
+    background: radial-gradient(70% 130% at 50% 0%, rgba(74,70,245,.9), var(--accent) 60%, var(--accent-ink));
+    color: #fff; text-align: center; border-radius: 28px; padding: clamp(44px, 7vw, 80px) 28px;
+    box-shadow: var(--shadow-lg); position: relative; overflow: hidden;
+  }
+  .cta h2 { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 900; color: #fff; }
+  .cta p { margin: 18px auto 30px; font-size: 1.14rem; color: rgba(255,255,255,.86); max-width: 44ch; }
+  .cta .btn-onlight { color: var(--accent-ink); font-weight: 700; }
+
+  /* footer */
+  footer.foot { background: var(--hero-bg); color: var(--hero-muted); padding: 60px 0 40px; }
+  .foot-grid { display: grid; gap: 32px; grid-template-columns: 1fr; }
+  @media (min-width: 760px) { .foot-grid { grid-template-columns: 2fr 1fr 1fr; } }
+  .foot .brand { margin-bottom: 14px; }
+  .foot p.fdesc { font-size: .95rem; max-width: 34ch; }
+  .foot h4 { font-family: "JetBrains Mono", monospace; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: #fff; margin: 0 0 14px; font-weight: 600; }
+  .foot ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 9px; }
+  .foot ul a { color: var(--hero-muted); text-decoration: none; font-size: .95rem; }
+  .foot ul a:hover { color: #fff; }
+  .foot-bottom { margin-top: 44px; padding-top: 22px; border-top: 1px solid var(--hero-line); display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; font-size: .84rem; }
+
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="container nav-inner">
+    <a class="brand" href="/"><span class="spark">⚡</span>Test&nbsp;My&nbsp;Reading&nbsp;Speed</a>
+    <nav class="nav-links" aria-label="Primary">
+      <a class="textlink" href="#how">How it works</a>
+      <a class="textlink" href="#compete">Compete</a>
+      <a class="textlink" href="https://app.testmyreadingspeed.com/login">Log in</a>
+      <a class="btn btn-primary" href="https://app.testmyreadingspeed.com/register">Join free</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- ============ HERO + LIVE TEST ============ -->
+  <section class="hero" style="padding-top:44px">
+    <div class="container hero-grid">
+      <div>
+        <span class="eyebrow"><span class="dot"></span>Free · No sign-up · 60 seconds</span>
+        <h1>How fast<br>do you <span class="hl">read?</span></h1>
+        <p class="hero-sub">Take the reading speed test, get your words-per-minute and comprehension score, then challenge your friends and climb the global leaderboard.</p>
+        <div class="hero-meta">
+          <div class="m"><span class="n" data-count="48200">48,200</span><span class="l">Readers tested</span></div>
+          <div class="m"><span class="n" data-count="37">37</span><span class="l">Countries</span></div>
+          <div class="m"><span class="n" data-count="252">252</span><span class="l">Avg WPM</span></div>
+        </div>
+      </div>
+
+      <!-- The live test -->
+      <div class="test-card" id="test">
+        <div class="test-top">
+          <span class="tt-title">Reading Speed Test</span>
+          <span class="timer" id="timer">0.0s</span>
+        </div>
+        <div class="test-body">
+
+          <!-- Stage 1: intro -->
+          <div class="stage active" id="stage-intro">
+            <div class="intro-illo">📖</div>
+            <h3>Ready when you are</h3>
+            <p>You'll read a short passage. We time you, then ask three quick questions — because speed only counts if you understood it.</p>
+            <ul class="steps">
+              <li><span class="sn">1</span> Click start and read the passage naturally</li>
+              <li><span class="sn">2</span> Hit "I'm done" the moment you finish</li>
+              <li><span class="sn">3</span> Answer 3 questions for your real score</li>
+            </ul>
+            <button class="btn btn-primary btn-lg" id="btn-start" style="align-self:flex-start">Start the test →</button>
+          </div>
+
+          <!-- Stage 2: reading -->
+          <div class="stage" id="stage-read">
+            <div class="passage" id="passage">
+              <p>Every time you read a line, your eyes do not glide smoothly across it. They move in short, sharp jumps called saccades, pausing four or five times to grab a small cluster of words before leaping ahead. The pauses, not the jumps, are where reading actually happens — your brain stitching the snapshots into meaning faster than you notice.</p>
+              <p>The average adult reads somewhere between two hundred and two hundred and fifty words per minute. Skilled readers push past three hundred while still following the argument, and trained speed readers can clear five hundred. But raw pace is only half the story. A reader who races through a page and remembers nothing has not really read it at all, which is why comprehension is measured alongside speed.</p>
+              <p>The encouraging part is that reading speed is a trainable skill. Widening the span of words your eyes take in per pause, resisting the habit of silently sounding out each word, and simply reading more all nudge the number upward. Like any sport, it rewards practice, measurement, and a little friendly competition.</p>
+            </div>
+            <div class="read-actions">
+              <button class="btn btn-primary btn-lg" id="btn-done">I'm done reading</button>
+              <span class="read-hint">Read at your natural pace — no skimming.</span>
+            </div>
+          </div>
+
+          <!-- Stage 3: quiz -->
+          <div class="stage" id="stage-quiz">
+            <h3>Three quick questions</h3>
+            <p class="qsub">So we can score comprehension, not just speed.</p>
+            <div id="quiz"></div>
+            <button class="btn btn-primary btn-lg" id="btn-score" style="align-self:flex-start;margin-top:4px">See my score →</button>
+          </div>
+
+          <!-- Stage 4: result -->
+          <div class="stage" id="stage-result">
+            <div class="wpm-big" id="r-wpm">0</div>
+            <div class="wpm-unit">words per minute</div>
+            <p class="result-line" id="r-line"></p>
+            <div class="result-stats">
+              <div class="rstat"><div class="rn" id="r-raw">0</div><div class="rl">Raw WPM</div></div>
+              <div class="rstat green"><div class="rn" id="r-comp">0%</div><div class="rl">Comprehension</div></div>
+              <div class="rstat gold"><div class="rn" id="r-pct">0%</div><div class="rl">Faster than</div></div>
+            </div>
+            <div class="result-actions">
+              <a class="btn btn-primary btn-lg" href="https://app.testmyreadingspeed.com/register">Join the competition →</a>
+              <div class="share-row" id="share-row" aria-label="Share your result">
+                <button class="share-btn" data-share="whatsapp" title="Share on WhatsApp" aria-label="Share on WhatsApp">🟢</button>
+                <button class="share-btn" data-share="x" title="Share on X" aria-label="Share on X">✕</button>
+                <button class="share-btn" data-share="facebook" title="Share on Facebook" aria-label="Share on Facebook">f</button>
+                <button class="share-btn" data-share="copy" title="Copy challenge link" aria-label="Copy link" id="copy-btn">🔗</button>
+              </div>
+              <button class="restart" id="btn-restart">Take the test again</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HOW IT WORKS ============ -->
+  <section id="how">
+    <div class="container">
+      <div class="narrow">
+        <p class="eyebrow sec-eyebrow">How it works</p>
+        <h2 class="sec-h">From "how fast am I?" to world ranked — in three steps.</h2>
+      </div>
+      <div class="steps-3">
+        <div class="step-card">
+          <span class="sk-ic">⏱️</span>
+          <div class="sk-n">STEP 01</div>
+          <h3>Take the test</h3>
+          <p>Read a passage, answer a few questions, and get your true reading score — speed balanced by how much you actually understood.</p>
+        </div>
+        <div class="step-card">
+          <span class="sk-ic">🎯</span>
+          <div class="sk-n">STEP 02</div>
+          <h3>Join a competition</h3>
+          <p>Enter live reading championships for your age group. Same book, same clock, readers from dozens of countries — all at once.</p>
+        </div>
+        <div class="step-card">
+          <span class="sk-ic">🏆</span>
+          <div class="sk-n">STEP 03</div>
+          <h3>Climb & share</h3>
+          <p>Earn badges, build streaks, rise up the global leaderboard, and challenge your friends to beat your WPM.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ GAMIFICATION BAND ============ -->
+  <section class="band" id="compete">
+    <div class="container">
+      <div class="narrow">
+        <p class="eyebrow sec-eyebrow">Not just a test — a game</p>
+        <h2 class="sec-h">Reading, turned into a sport you'll want to keep playing.</h2>
+        <p class="sec-lead">Testing your speed is the hook. Staying is about the streaks, the badges, and the rush of a live competition against real readers around the world.</p>
+      </div>
+      <div class="feature-grid">
+        <div class="feature"><div class="fic a">🏅</div><h3>Badges & levels</h3><p>Unlock 35+ achievements as you read — from your first competition to a week-long streak.</p></div>
+        <div class="feature"><div class="fic b">🔥</div><h3>Daily streaks</h3><p>Keep the flame alive. Come back, read, and watch your streak — and your XP — grow.</p></div>
+        <div class="feature"><div class="fic c">🌍</div><h3>Global leaderboard</h3><p>See exactly where you rank among readers worldwide, updated live as scores come in.</p></div>
+        <div class="feature"><div class="fic a">📚</div><h3>Real competitions</h3><p>Scheduled live events with a shared book and timer — everyone reads the same challenge together.</p></div>
+        <div class="feature"><div class="fic b">🤝</div><h3>Invite friends</h3><p>Share your code, bring in friends, and earn referral points every time they join.</p></div>
+        <div class="feature"><div class="fic c">🌐</div><h3>Read in your language</h3><p>Compete in 12 languages — pick yours and read a book made for it.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WHY IT HELPS ============ -->
+  <section>
+    <div class="container">
+      <div class="narrow">
+        <p class="eyebrow sec-eyebrow">Why it matters</p>
+        <h2 class="sec-h">Speed means nothing without understanding.</h2>
+      </div>
+      <div class="benefit-row">
+        <ul class="benefit-list">
+          <li><span class="bic">✓</span><div><h3>Measure what's real</h3><p>Anyone can skim. Our score combines your reading speed with a comprehension check, so it reflects reading you'd actually remember.</p></div></li>
+          <li><span class="bic">✓</span><div><h3>Improve with feedback</h3><p>Track your WPM over time, spot your progress, and turn a vague "I read a lot" into a number you can grow.</p></div></li>
+          <li><span class="bic">✓</span><div><h3>Great for every age</h3><p>Purpose-built categories for kids, teens, and adults — fair matchups and age-appropriate books.</p></div></li>
+        </ul>
+        <div class="formula-card">
+          <span class="fc-label">How your score works</span>
+          <div class="fc-eq"><span class="speed">Speed</span> <span class="op">×</span> <span class="comp">Comprehension</span></div>
+          <p>Read fast <em>and</em> understand well to top the table. Blitz through without absorbing it and the score won't reward you — exactly like real reading.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ COMPARISON ============ -->
+  <section id="compare" style="padding-top:0">
+    <div class="container">
+      <div class="narrow">
+        <p class="eyebrow sec-eyebrow">How we compare</p>
+        <h2 class="sec-h">Most speed-reading apps drill you alone. Test My Reading Speed is a competition.</h2>
+        <p class="sec-lead">The popular apps flash words at you or drag a highlighter across your own text — solo practice, no stakes, and rarely any check on whether you understood it. Here's how we compare.</p>
+      </div>
+
+      <div class="compare-wrap">
+        <table class="compare">
+          <thead>
+            <tr>
+              <th>App</th>
+              <th>How it works</th>
+              <th style="text-align:center">Scores<br>comprehension</th>
+              <th style="text-align:center">Live head-to-head<br>competition</th>
+              <th>Best for</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="row-us">
+              <td><span class="app">⚡ Test My Reading Speed <span class="badge-us">This one</span></span></td>
+              <td class="how">Read real books, ranked against the world</td>
+              <td class="mark yes" aria-label="Yes">✓</td>
+              <td class="mark yes" aria-label="Yes">✓</td>
+              <td class="bestfor">Readers who want a challenge, not a drill</td>
+            </tr>
+            <tr>
+              <td><span class="app">Spreeder</span></td>
+              <td class="how">Flashes words one at a time (RSVP)</td>
+              <td class="mark no" aria-label="No">—</td>
+              <td class="mark no" aria-label="No">—</td>
+              <td class="bestfor">Solo word-flash speed drills</td>
+            </tr>
+            <tr>
+              <td><span class="app">Acceleread</span></td>
+              <td class="how">RSVP plus eye-movement drills</td>
+              <td class="mark part" aria-label="Partial">Practice</td>
+              <td class="mark no" aria-label="No">—</td>
+              <td class="bestfor">A daily solo training habit</td>
+            </tr>
+            <tr>
+              <td><span class="app">Outread</span></td>
+              <td class="how">Moving highlight over your own articles</td>
+              <td class="mark no" aria-label="No">—</td>
+              <td class="mark no" aria-label="No">—</td>
+              <td class="bestfor">Speeding through your own reading list</td>
+            </tr>
+            <tr>
+              <td><span class="app">Spritz</span></td>
+              <td class="how">One word at a time, fixed point</td>
+              <td class="mark no" aria-label="No">—</td>
+              <td class="mark no" aria-label="No">—</td>
+              <td class="bestfor">Reading on very small screens</td>
+            </tr>
+            <tr>
+              <td><span class="app">Speechify</span></td>
+              <td class="how">Reads text aloud to you</td>
+              <td class="mark no" aria-label="No">—</td>
+              <td class="mark no" aria-label="No">—</td>
+              <td class="bestfor">Listening instead of reading</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="compare-legend">
+        <span><b class="mark yes" style="font-size:1rem">✓</b> Built in</span>
+        <span><b style="color:var(--gold)">Practice</b> Practice checks only</span>
+        <span><b style="color:#c3c6d2">—</b> Not offered</span>
+      </div>
+      <p class="compare-note">Comparison based on each app's publicly listed features, 2026. Other names belong to their respective owners.</p>
+    </div>
+  </section>
+
+  <!-- ============ CATEGORIES ============ -->
+  <section style="padding-top:0">
+    <div class="container center">
+      <p class="eyebrow sec-eyebrow">Pick your league</p>
+      <h2 class="sec-h">A competition for every reader.</h2>
+      <div class="cats">
+        <div class="cat"><div class="cemoji">🧒</div><h3>Kids</h3><div class="cage">AGES 6–12</div></div>
+        <div class="cat"><div class="cemoji">🧑‍🎓</div><h3>Teens</h3><div class="cage">AGES 13–17</div></div>
+        <div class="cat"><div class="cemoji">🧑</div><h3>Adults</h3><div class="cage">AGES 18+</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FINAL CTA ============ -->
+  <section style="padding-top:0">
+    <div class="container">
+      <div class="cta">
+        <h2>Ready to find your rank?</h2>
+        <p>You've seen your speed. Now put it on the board — join the free global reading championship.</p>
+        <a class="btn btn-onlight btn-lg" href="https://app.testmyreadingspeed.com/register">Create your free account →</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ============ FOOTER ============ -->
+<footer class="foot">
+  <div class="container">
+    <div class="foot-grid">
+      <div>
+        <a class="brand" href="/"><span class="spark">⚡</span>Test My Reading Speed</a>
+        <p class="fdesc">The free reading speed test and global gamified reading competition. Measure your WPM, prove your comprehension, and read your way up the leaderboard.</p>
+      </div>
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#compete">Competitions</a></li>
+          <li><a href="https://app.testmyreadingspeed.com/register">Join free</a></li>
+          <li><a href="https://app.testmyreadingspeed.com/login">Log in</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Learn</h4>
+        <ul>
+          <li><a href="#test">Reading speed test</a></li>
+          <li><a href="#how">What is a good WPM?</a></li>
+          <li><a href="#compete">How to read faster</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 Test My Reading Speed · WABA League</span>
+      <span class="mono">testmyreadingspeed.com</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+  var passageEl = document.getElementById("passage");
+  var words = passageEl.innerText.trim().split(/\s+/).filter(Boolean).length;
+
+  var quizData = [
+    { q: "What are the short, sharp jumps your eyes make while reading called?", opts: ["Saccades", "Synapses", "Glides", "Fixations"], a: 0 },
+    { q: "What is the average adult reading speed?", opts: ["100–150 WPM", "200–250 WPM", "400–450 WPM", "600+ WPM"], a: 1 },
+    { q: "According to the passage, why is comprehension measured alongside speed?", opts: ["To slow readers down", "Because racing through without remembering isn't really reading", "To make the test longer", "Because eyes get tired"], a: 1 }
+  ];
+
+  var stages = {
+    intro: document.getElementById("stage-intro"),
+    read: document.getElementById("stage-read"),
+    quiz: document.getElementById("stage-quiz"),
+    result: document.getElementById("stage-result")
+  };
+  function show(name) {
+    Object.keys(stages).forEach(function (k) { stages[k].classList.toggle("active", k === name); });
+  }
+
+  var timerEl = document.getElementById("timer");
+  var startTime = 0, rafId = null;
+  function tick() {
+    var s = (Date.now() - startTime) / 1000;
+    timerEl.textContent = s.toFixed(1) + "s";
+    rafId = requestAnimationFrame(tick);
+  }
+  function startTimer() { startTime = Date.now(); tick(); }
+  function stopTimer() { if (rafId) cancelAnimationFrame(rafId); return (Date.now() - startTime) / 1000; }
+
+  var elapsed = 0, rawWpm = 0;
+
+  document.getElementById("btn-start").addEventListener("click", function () {
+    show("read"); startTimer();
+  });
+
+  document.getElementById("btn-done").addEventListener("click", function () {
+    elapsed = stopTimer();
+    if (elapsed < 3) elapsed = 3;
+    rawWpm = Math.round(words / (elapsed / 60));
+    buildQuiz();
+    show("quiz");
+  });
+
+  function buildQuiz() {
+    var wrap = document.getElementById("quiz");
+    wrap.innerHTML = "";
+    quizData.forEach(function (item, qi) {
+      var q = document.createElement("div");
+      q.className = "quiz-q";
+      var p = document.createElement("div");
+      p.className = "qp";
+      p.textContent = (qi + 1) + ". " + item.q;
+      q.appendChild(p);
+      var opts = document.createElement("div");
+      opts.className = "opts";
+      item.opts.forEach(function (text, oi) {
+        var label = document.createElement("label");
+        label.className = "opt";
+        var input = document.createElement("input");
+        input.type = "radio"; input.name = "q" + qi; input.value = oi;
+        input.addEventListener("change", function () {
+          opts.querySelectorAll(".opt").forEach(function (o) { o.classList.remove("sel"); });
+          label.classList.add("sel");
+        });
+        var span = document.createElement("span");
+        span.textContent = text;
+        label.appendChild(input); label.appendChild(span);
+        opts.appendChild(label);
+      });
+      q.appendChild(opts);
+      wrap.appendChild(q);
+    });
+  }
+
+  function animateCount(el, to, suffix) {
+    suffix = suffix || "";
+    var dur = 900, t0 = null;
+    function step(ts) {
+      if (!t0) t0 = ts;
+      var p = Math.min((ts - t0) / dur, 1);
+      var eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(to * eased) + suffix;
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  document.getElementById("btn-score").addEventListener("click", function () {
+    var correct = 0;
+    quizData.forEach(function (item, qi) {
+      var sel = document.querySelector('input[name="q' + qi + '"]:checked');
+      if (sel && parseInt(sel.value, 10) === item.a) correct++;
+    });
+    var comp = Math.round((correct / quizData.length) * 100);
+    // effective score gently weights comprehension so skimming can't win
+    var effective = Math.round(rawWpm * (0.5 + 0.5 * (comp / 100)));
+    // rough percentile vs a 252 avg / 60 sd bell-ish curve, clamped
+    var pct = Math.max(5, Math.min(97, Math.round(50 + (effective - 252) / 2.2)));
+
+    document.getElementById("r-raw").textContent = rawWpm;
+    document.getElementById("r-comp").textContent = comp + "%";
+    document.getElementById("r-pct").textContent = pct + "%";
+
+    var line = document.getElementById("r-line");
+    var verdict = effective >= 400 ? "That's championship pace. 🏆"
+      : effective >= 300 ? "Faster than most — seriously sharp. ⚡"
+      : effective >= 220 ? "Right around a strong, steady reader. 📚"
+      : "A solid base to build on — speed is trainable. 🌱";
+    line.innerHTML = "<b>" + verdict + "</b> Your comprehension-adjusted score puts you ahead of <b>" + pct + "%</b> of readers.";
+
+    window._tmrsResult = { wpm: effective, comp: comp, pct: pct };
+    show("result");
+    animateCount(document.getElementById("r-wpm"), effective);
+  });
+
+  document.getElementById("btn-restart").addEventListener("click", function () {
+    timerEl.textContent = "0.0s"; show("intro");
+  });
+
+  // Sharing
+  var shareText = function () {
+    var r = window._tmrsResult || { wpm: rawWpm };
+    return "I read " + r.wpm + " WPM on Test My Reading Speed — can you beat me? 📖⚡";
+  };
+  var shareUrl = "https://testmyreadingspeed.com/";
+  document.getElementById("share-row").addEventListener("click", function (e) {
+    var btn = e.target.closest(".share-btn"); if (!btn) return;
+    var kind = btn.getAttribute("data-share");
+    var t = encodeURIComponent(shareText());
+    var u = encodeURIComponent(shareUrl);
+    var link = null;
+    if (kind === "whatsapp") link = "https://wa.me/?text=" + t + "%20" + u;
+    else if (kind === "x") link = "https://twitter.com/intent/tweet?text=" + t + "&url=" + u;
+    else if (kind === "facebook") link = "https://www.facebook.com/sharer/sharer.php?u=" + u;
+    else if (kind === "copy") {
+      if (navigator.share) { navigator.share({ text: shareText(), url: shareUrl }).catch(function () {}); return; }
+      try { navigator.clipboard.writeText(shareText() + " " + shareUrl); btn.textContent = "✓"; setTimeout(function () { btn.textContent = "🔗"; }, 1500); } catch (err) {}
+      return;
+    }
+    if (link) window.open(link, "_blank", "noopener");
+  });
+
+  // Animate hero stats when they scroll into view
+  var counted = false;
+  function heroCounts() {
+    if (counted) return; counted = true;
+    document.querySelectorAll(".hero-meta .n").forEach(function (el) {
+      var target = parseInt(el.getAttribute("data-count"), 10);
+      var isComma = target >= 1000;
+      var dur = 1100, t0 = null;
+      function step(ts) {
+        if (!t0) t0 = ts;
+        var p = Math.min((ts - t0) / dur, 1);
+        var eased = 1 - Math.pow(1 - p, 3);
+        var v = Math.round(target * eased);
+        el.textContent = isComma ? v.toLocaleString() : v;
+        if (p < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    });
+  }
+  if (!window.matchMedia || !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    setTimeout(heroCounts, 400);
+  }
+})();
+</script>
+</body>
+</html>
