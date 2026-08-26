@@ -34,7 +34,7 @@ export function serveStatic(app: Express) {
     res.type("text/plain");
     if (isMarketingHost(req.headers.host || "")) {
       res.send(
-        "User-agent: *\nAllow: /\nSitemap: https://testmyreadingspeed.com/sitemap.xml\n",
+        "User-agent: *\nAllow: /\nSitemap: https://www.testmyreadingspeed.com/sitemap.xml\n",
       );
     } else {
       res.send("User-agent: *\nAllow: /\n");
@@ -48,7 +48,7 @@ export function serveStatic(app: Express) {
       '<?xml version="1.0" encoding="UTF-8"?>\n' +
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
         "  <url>\n" +
-        "    <loc>https://testmyreadingspeed.com/</loc>\n" +
+        "    <loc>https://www.testmyreadingspeed.com/</loc>\n" +
         "    <changefreq>weekly</changefreq>\n" +
         "    <priority>1.0</priority>\n" +
         "  </url>\n" +
