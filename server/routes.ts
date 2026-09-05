@@ -102,9 +102,18 @@ const prizeSchema = z.object({
   content: z.string().optional(),
 });
 
-const JWT_SECRET = process.env.SESSION_SECRET || "speed-reading-secret-key-change-in-production";
+// Never sign tokens with a public default in production — this repo is public.
+const JWT_SECRET = (() => {
+  const secret = process.env.SESSION_SECRET;
+  if (secret) return secret;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET is required in production. Set it in your hosting environment variables.");
+  }
+  return "dev-only-insecure-secret";
+})();
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@demo.com";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin123!";
+// No hardcoded default password. ADMIN_PASSWORD (env) is the source of truth — see seedAdmin().
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 function generateAffiliateCode(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -163,7 +172,9 @@ function studentMiddleware(req: AuthRequest, res: Response, next: NextFunction) 
 async function seedAdmin() {
   const existing = await storage.getUserByEmail(ADMIN_EMAIL);
   if (!existing) {
-    const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
+    // No hardcoded default: use ADMIN_PASSWORD, or generate a random one and log it once.
+    const initialPassword = ADMIN_PASSWORD || crypto.randomBytes(12).toString("base64url");
+    const passwordHash = await bcrypt.hash(initialPassword, 10);
     await storage.createUser({
       email: ADMIN_EMAIL,
       passwordHash,
@@ -173,6 +184,19 @@ async function seedAdmin() {
       affiliateCode: "ADMIN001",
     });
     console.log(`Admin user created: ${ADMIN_EMAIL}`);
+    if (!ADMIN_PASSWORD) {
+      console.log(`Generated admin password (set ADMIN_PASSWORD to control it): ${initialPassword}`);
+    }
+    return;
+  }
+  // Rotate the existing admin's password whenever it no longer matches ADMIN_PASSWORD (env is the source of truth).
+  if (ADMIN_PASSWORD) {
+    const matches = await bcrypt.compare(ADMIN_PASSWORD, existing.passwordHash);
+    if (!matches) {
+      const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
+      await storage.updateUser(existing.id, { passwordHash });
+      console.log(`Admin password rotated from ADMIN_PASSWORD for ${ADMIN_EMAIL}`);
+    }
   }
 }
 
