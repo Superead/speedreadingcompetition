@@ -2119,6 +2119,18 @@ export async function registerRoutes(
     }
   });
 
+  // Roster: all registered students for a competition, including those who
+  // haven't pressed Start yet (they have a registration but no submission).
+  const rosterHandler = async (req: AuthRequest, res: Response) => {
+    try {
+      res.json(await storage.getCompetitionRoster(req.params.id));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch roster" });
+    }
+  };
+  app.get("/api/admin/competitions/:id/roster", authMiddleware, adminMiddleware, rosterHandler);
+  app.get("/api/teacher/competitions/:id/roster", authMiddleware, teacherOrAdminMiddleware, rosterHandler);
+
   // Competition submissions and leaderboard
   app.get("/api/admin/competitions/:id/submissions", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
     try {

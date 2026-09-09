@@ -25,6 +25,18 @@ export interface SubmissionWithUser extends Submission {
   userCountry: string | null;
 }
 
+export interface CompetitionRosterEntry {
+  registrationId: string;
+  userId: string;
+  userName: string;
+  userEmail: string | null;
+  userCity: string | null;
+  userCountry: string | null;
+  language: string;
+  registeredAt: Date | null;
+  submission: Submission | null;
+}
+
 export interface SubmissionWithDetails extends Submission {
   user: User;
   referrer?: User;
@@ -145,6 +157,7 @@ export interface IStorage {
   getRegistration(competitionId: string, userId: string): Promise<CompetitionRegistration | undefined>;
   getUserRegistrations(userId: string): Promise<CompetitionRegistration[]>;
   getCompetitionRegistrations(competitionId: string): Promise<CompetitionRegistration[]>;
+  getCompetitionRoster(competitionId: string): Promise<CompetitionRosterEntry[]>;
   registerForCompetition(competitionId: string, userId: string, language?: string): Promise<CompetitionRegistration>;
 
   // Competition Submissions
@@ -921,6 +934,35 @@ export class DatabaseStorage implements IStorage {
 
   async getCompetitionRegistrations(competitionId: string): Promise<CompetitionRegistration[]> {
     return db.select().from(competitionRegistrations).where(eq(competitionRegistrations.competitionId, competitionId));
+  }
+
+  // Roster: every registered student for a competition, joined with their
+  // submission (null until they press Start Reading). Three bulk queries, no N+1.
+  async getCompetitionRoster(competitionId: string): Promise<CompetitionRosterEntry[]> {
+    const regs = await db.select().from(competitionRegistrations)
+      .where(eq(competitionRegistrations.competitionId, competitionId));
+    if (regs.length === 0) return [];
+    const userIds = Array.from(new Set(regs.map(r => r.userId)));
+    const [userRows, subRows] = await Promise.all([
+      db.select().from(users).where(inArray(users.id, userIds)),
+      db.select().from(submissions).where(eq(submissions.competitionId, competitionId)),
+    ]);
+    const userMap = new Map(userRows.map(u => [u.id, u]));
+    const subMap = new Map(subRows.map(s => [s.userId, s]));
+    return regs.map(r => {
+      const u = userMap.get(r.userId);
+      return {
+        registrationId: r.id,
+        userId: r.userId,
+        userName: u ? `${u.name} ${u.surname}` : "Unknown",
+        userEmail: u?.email || null,
+        userCity: u?.city || null,
+        userCountry: u?.country || null,
+        language: r.language,
+        registeredAt: r.registeredAt,
+        submission: subMap.get(r.userId) || null,
+      };
+    });
   }
 
   async registerForCompetition(competitionId: string, userId: string, language?: string): Promise<CompetitionRegistration> {

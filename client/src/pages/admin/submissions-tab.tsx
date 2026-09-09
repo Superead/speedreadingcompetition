@@ -549,6 +549,26 @@ function SubmissionsTab({
     return true;
   });
 
+  // Registered-but-not-started students. Only fetched when a specific competition
+  // is selected; entries that already have a submission are shown in the list above.
+  const { data: roster } = useQuery<{
+    registrationId: string;
+    userName: string;
+    userEmail: string | null;
+    language: string;
+    registeredAt: string | null;
+    submission: Submission | null;
+  }[]>({
+    queryKey: [`${apiPrefix}/competitions`, filterCompetition, "roster"],
+    enabled: filterCompetition !== "all",
+    staleTime: 30_000,
+  });
+  const pendingRegistrations = (filterCompetition !== "all" ? roster || [] : []).filter((r) => {
+    if (r.submission) return false;
+    if (filterLanguage !== "all" && r.language !== filterLanguage) return false;
+    return true;
+  });
+
   const scoreMutation = useMutation({
     mutationFn: async ({ id, manualScore }: { id: string; manualScore: number }) => {
       const res = await apiRequest("PUT", `${apiPrefix}/submissions/${id}/manual-score`, { manualScore });
@@ -624,6 +644,11 @@ function SubmissionsTab({
           </div>
         )}
         <Badge variant="secondary">{filteredSubmissions?.length || 0} submissions</Badge>
+        {filterCompetition !== "all" && (
+          <Badge variant="outline" className="border-amber-500 text-amber-600">
+            {pendingRegistrations.length} registered, not started
+          </Badge>
+        )}
         <Button variant="outline" size="sm" onClick={() => refetchSubmissions()}>
           <RefreshCw className="h-4 w-4 mr-1" /> Refresh
         </Button>
@@ -732,6 +757,33 @@ function SubmissionsTab({
                       ) : (
                         <Badge variant="outline">Not Started</Badge>
                       )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {pendingRegistrations.map((r) => (
+                  <TableRow key={`reg-${r.registrationId}`} className="text-muted-foreground" data-testid={`row-registration-${r.registrationId}`}>
+                    <TableCell className="sticky right-0 bg-background z-10" />
+                    <TableCell className="font-medium text-foreground">{r.userName}</TableCell>
+                    <TableCell className="hidden md:table-cell">{r.userEmail || "-"}</TableCell>
+                    <TableCell className="text-sm">{competitions?.find(c => c.id === filterCompetition)?.title || "-"}</TableCell>
+                    {showLanguageFilter && (
+                      <TableCell className="text-sm">
+                        {(() => {
+                          const lang = SUPPORTED_LANGUAGES.find(l => l.code === r.language);
+                          return lang ? `${lang.flag} ${lang.code.toUpperCase()}` : r.language || "-";
+                        })()}
+                      </TableCell>
+                    )}
+                    <TableCell>-</TableCell>
+                    <TableCell>-</TableCell>
+                    <TableCell>-</TableCell>
+                    <TableCell>-</TableCell>
+                    <TableCell>-</TableCell>
+                    <TableCell>-</TableCell>
+                    <TableCell>-</TableCell>
+                    {showReviewerColumn && <TableCell>-</TableCell>}
+                    <TableCell>
+                      <Badge variant="outline" className="border-amber-500 text-amber-600">Registered</Badge>
                     </TableCell>
                   </TableRow>
                 ))}
