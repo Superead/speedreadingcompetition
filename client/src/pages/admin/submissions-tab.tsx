@@ -213,7 +213,10 @@ function SubmissionDetailDialog({ submissionId, onClose, apiPrefix = "/api/admin
     const mcqCorrect = details.mcqCorrectCount || 0;
     const mcqTotal = details.mcqTotalCount || 0;
     const textAnswers = details.answers.filter((a) => a.type === "TEXT");
-    const textMax = textAnswers.reduce((sum, a: any) => sum + (a.question?.maxPoints || 1), 0);
+    // Prefer the server's denominator (ALL text questions, unanswered = 0) so the live
+    // preview matches the saved score; fall back to answered-only for old responses.
+    const textMax = (details as any).textMaxPoints
+      ?? textAnswers.reduce((sum, a: any) => sum + (a.question?.maxPoints || 1), 0);
     const totalScored = mcqCorrect + liveManualScore;
     const totalMax = mcqTotal + textMax;
     if (totalMax === 0) return 0;
@@ -569,20 +572,6 @@ function SubmissionsTab({
     return true;
   });
 
-  const scoreMutation = useMutation({
-    mutationFn: async ({ id, manualScore }: { id: string; manualScore: number }) => {
-      const res = await apiRequest("PUT", `${apiPrefix}/submissions/${id}/manual-score`, { manualScore });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`${apiPrefix}/submissions`] });
-      toast({ title: "Score updated" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to update", description: error.message, variant: "destructive" });
-    },
-  });
-
   if (isLoading) {
     return <Skeleton className="h-96 w-full" />;
   }
@@ -718,21 +707,8 @@ function SubmissionsTab({
                       <span>{submission.mcqTotalCount || 0}</span>
                     </TableCell>
                     <TableCell>{submission.autoScore ?? "-"}</TableCell>
-                    <TableCell>
-                      <Input
-                        key={`manual-${submission.id}-${submission.manualScore ?? ""}`}
-                        type="number"
-                        className="w-16"
-                        placeholder="-"
-                        defaultValue={submission.manualScore ?? ""}
-                        onBlur={(e) => {
-                          const value = parseInt(e.target.value);
-                          if (!isNaN(value)) {
-                            scoreMutation.mutate({ id: submission.id, manualScore: value });
-                          }
-                        }}
-                        data-testid={`input-manual-score-${submission.id}`}
-                      />
+                    <TableCell title="Sum of text-answer points scored in the review dialog" data-testid={`text-manual-score-${submission.id}`}>
+                      {submission.manualScore ?? "-"}
                     </TableCell>
                     <TableCell className="font-bold">{submission.finalScore ?? "-"}</TableCell>
                     <TableCell className="font-bold text-primary">{(submission as any).wabaScore ?? "-"}</TableCell>

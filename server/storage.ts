@@ -40,6 +40,9 @@ export interface CompetitionRosterEntry {
 export interface SubmissionWithDetails extends Submission {
   user: User;
   referrer?: User;
+  // Sum of maxPoints across ALL text questions for this submission's competition/language,
+  // so the review dialog's live preview uses the same denominator as the saved score.
+  textMaxPoints?: number;
   answers: (Answer & { question: any })[];
 }
 
@@ -431,11 +434,24 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
+    // Match recalculateSubmissionScores: the denominator counts every TEXT question in the
+    // competition (unanswered = 0 of its max), not just the ones the student answered.
+    const lang = (submission as any).language
+      || answersWithQuestions.find(a => a.question?.language)?.question?.language
+      || "tr";
+    const allQuestions: any[] = submission.competitionId
+      ? await this.getCompetitionQuestions(submission.competitionId, lang)
+      : await this.getQuestions(submission.category);
+    const textMaxPoints = allQuestions
+      .filter(q => q.type === "TEXT")
+      .reduce((sum, q) => sum + (q.maxPoints || 1), 0);
+
     return {
       ...submission,
       user,
       referrer,
       answers: answersWithQuestions,
+      textMaxPoints,
     };
   }
 
