@@ -227,21 +227,6 @@ function SubmissionDetailDialog({ submissionId, onClose, apiPrefix = "/api/admin
   const liveFinalScore = Math.round(liveFinalRaw * 100) / 100;
   const liveWabaScore = Math.round(liveFinalRaw * (0.6 + liveComprehension) * 100) / 100;
 
-  const scoreMutation = useMutation({
-    mutationFn: async (manualScore: number) => {
-      const res = await apiRequest("PUT", `${apiPrefix}/submissions/${submissionId}/manual-score`, { manualScore });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`${apiPrefix}/submissions`] });
-      refetch();
-      toast({ title: "Score updated" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to update", description: error.message, variant: "destructive" });
-    },
-  });
-
   const recalculateMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `${apiPrefix}/submissions/${submissionId}/recalculate`, {});
