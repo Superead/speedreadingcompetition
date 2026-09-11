@@ -310,14 +310,38 @@ function TeacherSection() {
 function UsersTab() {
   const { toast } = useToast();
   const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [search, setSearch] = useState("");
+  const [resetTarget, setResetTarget] = useState<User | null>(null);
+  const [newPassword, setNewPassword] = useState("");
 
   const { data: users, isLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
   });
 
-  const filteredUsers = filterCategory === "all"
+  // No email provider yet, so admins need a manual way to rescue locked-out students.
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ id, password }: { id: string; password: string }) => {
+      const res = await apiRequest("PUT", `/api/admin/users/${id}/password`, { password });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Password reset", description: `${resetTarget?.name} ${resetTarget?.surname} can now log in with the new password.` });
+      setResetTarget(null);
+      setNewPassword("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to reset password", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const filteredUsers = (filterCategory === "all"
     ? users
-    : users?.filter((u) => u.category === filterCategory);
+    : users?.filter((u) => u.category === filterCategory)
+  )?.filter((u) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return `${u.name} ${u.surname} ${u.email || ""}`.toLowerCase().includes(q);
+  });
 
   const handleExport = async () => {
     try {
@@ -366,6 +390,13 @@ function UsersTab() {
                 ))}
               </SelectContent>
             </Select>
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search name or email…"
+              className="w-64"
+              data-testid="input-users-search"
+            />
             <Badge variant="secondary">{filteredUsers?.length || 0} users</Badge>
           </div>
           <Button variant="outline" onClick={handleExport} className="gap-2" data-testid="button-export-users">
@@ -381,22 +412,36 @@ function UsersTab() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>City</TableHead>
                     <TableHead>Affiliate Code</TableHead>
                     <TableHead>Referrals</TableHead>
                     <TableHead>Referred By</TableHead>
+                    <TableHead className="w-[60px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredUsers?.map((user) => (
                     <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
                       <TableCell className="font-medium">{user.name} {user.surname}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{user.email || "-"}</TableCell>
                       <TableCell><Badge variant="outline">{getCategoryTitle(user.category || "")}</Badge></TableCell>
                       <TableCell>{user.city || "-"}</TableCell>
                       <TableCell className="font-mono text-sm">{user.affiliateCode}</TableCell>
                       <TableCell>{user.referralPoints || 0}</TableCell>
                       <TableCell className="font-mono text-sm">{user.referrerId ? "Yes" : "-"}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Reset password"
+                          onClick={() => { setResetTarget(user); setNewPassword(""); }}
+                          data-testid={`button-reset-password-${user.id}`}
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -404,6 +449,42 @@ function UsersTab() {
             </ScrollArea>
           </CardContent>
         </Card>
+
+        <Dialog open={!!resetTarget} onOpenChange={(open) => { if (!open) { setResetTarget(null); setNewPassword(""); } }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Reset password</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <p className="text-sm text-muted-foreground">
+                Set a new password for <strong>{resetTarget?.name} {resetTarget?.surname}</strong>
+                {resetTarget?.email ? <> (<span className="font-mono">{resetTarget.email}</span>)</> : null}.
+                Share it with them directly — no email is sent.
+              </p>
+              <div className="space-y-2">
+                <Label>New password</Label>
+                <Input
+                  type="text"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="At least 6 characters"
+                  data-testid="input-new-password"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setResetTarget(null)}>Cancel</Button>
+              <Button
+                onClick={() => resetTarget && resetPasswordMutation.mutate({ id: resetTarget.id, password: newPassword })}
+                disabled={newPassword.length < 6 || resetPasswordMutation.isPending}
+                data-testid="button-confirm-reset-password"
+              >
+                {resetPasswordMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Set password
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

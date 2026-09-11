@@ -1270,6 +1270,27 @@ export async function registerRoutes(
     }
   });
 
+  // Admin: set a new password for a STUDENT. Needed because forgot-password has no
+  // email provider yet, so locked-out students have no self-service way back in.
+  app.put("/api/admin/users/:id/password", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const { password } = req.body;
+      if (!password || typeof password !== "string" || password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+      const user = await storage.getUser(id);
+      if (!user || user.role !== "STUDENT") {
+        return res.status(404).json({ error: "Student not found" });
+      }
+      const passwordHash = await bcrypt.hash(password, 10);
+      await storage.updateUser(id, { passwordHash });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to reset password" });
+    }
+  });
+
   app.delete("/api/admin/teachers/:id", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
