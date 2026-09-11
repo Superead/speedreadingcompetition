@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
+import { sendEmail, sendEmailBatch, emailConfigured, passwordResetEmail, competitionReminderEmail } from "./email";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import multer from "multer";
@@ -460,13 +461,17 @@ export async function registerRoutes(
         expiresAt,
       });
 
-      // Log the reset link (in production, send via email)
-      const resetUrl = `${req.protocol}://${req.get("host")}/reset-password?token=${token}`;
-      console.log(`[Password Reset] Link for ${email}: ${resetUrl}`);
+      const base = process.env.APP_BASE_URL || `${req.protocol}://${req.get("host")}`;
+      const resetUrl = `${base}/reset-password?token=${token}`;
+      // Email the link. If email isn't configured this logs and no-ops; we still
+      // answer success so the response never reveals whether the account exists.
+      const tpl = passwordResetEmail(user.name, resetUrl);
+      const result = await sendEmail({ to: user.email || email, toName: `${user.name} ${user.surname}`, ...tpl });
+      if (!result.sent) console.log(`[Password Reset] email not sent (${result.error}); link for ${email}: ${resetUrl}`);
 
       res.json({
         success: true,
-        message: "If an account exists with that email, a reset link has been generated.",
+        message: "If an account exists with that email, a reset link has been sent.",
         // Include resetUrl in dev mode so it can be used without email
         ...(process.env.NODE_ENV === "development" ? { resetUrl, token } : {}),
       });
@@ -2151,6 +2156,45 @@ export async function registerRoutes(
   };
   app.get("/api/admin/competitions/:id/roster", authMiddleware, adminMiddleware, rosterHandler);
   app.get("/api/teacher/competitions/:id/roster", authMiddleware, teacherOrAdminMiddleware, rosterHandler);
+
+  // Email every registered student a "your competition starts at …" reminder.
+  // Skips students who already finished. Returns per-run send counts.
+  app.post("/api/admin/competitions/:id/remind", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      if (!emailConfigured) {
+        return res.status(503).json({ error: "Email is not configured (set MAILJET_API_KEY and MAILJET_SECRET_KEY)" });
+      }
+      const competition = await storage.getCompetition(req.params.id);
+      if (!competition) return res.status(404).json({ error: "Competition not found" });
+
+      const { message } = req.body || {};
+      const roster = await storage.getCompetitionRoster(competition.id);
+      const recipients = roster.filter(r => r.userEmail && !r.submission?.answerEndAt);
+
+      const startsAt = competition.competitionStartTime ? new Date(competition.competitionStartTime) : null;
+      const startsAtText = startsAt
+        ? startsAt.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: process.env.COMPETITION_TZ || "Europe/Istanbul" })
+        : "soon";
+      const loginUrl = `${process.env.APP_BASE_URL || "https://app.testmyreadingspeed.com"}/login`;
+
+      const inputs = recipients.map(r => ({
+        to: r.userEmail!,
+        toName: r.userName,
+        ...competitionReminderEmail({
+          name: r.userName.split(" ")[0] || r.userName,
+          competitionTitle: competition.title,
+          startsAtText,
+          loginUrl,
+          customMessage: typeof message === "string" && message.trim() ? message.trim() : undefined,
+        }),
+      }));
+      const result = await sendEmailBatch(inputs);
+      res.json({ recipients: recipients.length, skipped: roster.length - recipients.length, startsAtText, ...result });
+    } catch (error) {
+      console.error("Remind error:", error);
+      res.status(500).json({ error: "Failed to send reminders" });
+    }
+  });
 
   // Competition submissions and leaderboard
   app.get("/api/admin/competitions/:id/submissions", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {

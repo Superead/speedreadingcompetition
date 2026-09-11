@@ -12,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Trash2, Loader2, Edit, Eye, EyeOff, RotateCcw } from "lucide-react";
+import { Plus, Trash2, Loader2, Edit, Eye, EyeOff, RotateCcw, Send } from "lucide-react";
 import type { Category, Competition, CompetitionBook } from "@shared/schema";
 import { SUPPORTED_LANGUAGES } from "@shared/schema";
 import {
@@ -58,6 +58,7 @@ function CompetitionsTab() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCompetition, setEditingCompetition] = useState<Competition | null>(null);
   const [selectedCompetitionId, setSelectedCompetitionId] = useState<string | null>(null);
+  const [remindMessage, setRemindMessage] = useState("");
   const [formData, setFormData] = useState({
     title: "",
     category: "kid" as Category,
@@ -186,6 +187,22 @@ function CompetitionsTab() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to reset", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const remindMutation = useMutation({
+    mutationFn: async ({ id, message }: { id: string; message: string }) => {
+      const res = await apiRequest("POST", `/api/admin/competitions/${id}/remind`, { message });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: `Reminders sent (${data.sent})`,
+        description: `${data.sent} sent · ${data.failed} failed · ${data.skipped} skipped (already finished). Start time in email: ${data.startsAtText}.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to send reminders", description: error.message, variant: "destructive" });
     },
   });
 
@@ -599,6 +616,36 @@ function CompetitionsTab() {
                               <AlertDialogFooter>
                                 <AlertDialogCancel data-testid="button-cancel-close-competition">Cancel</AlertDialogCancel>
                                 <AlertDialogAction onClick={() => closeMutation.mutate(comp.id)} data-testid="button-confirm-close-competition">Close Competition</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                        {comp.status === "ACTIVE" && (
+                          <AlertDialog onOpenChange={(open) => { if (open) setRemindMessage(""); }}>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" title="Email a start-time reminder to registered students" data-testid={`button-remind-competition-${comp.id}`}>
+                                <Send className="h-4 w-4 text-blue-600" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Email a reminder to registered students?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Sends "{comp.title} starts at …" — with the start time and a login link — to every registered student who hasn't finished yet ({comp.registrationCount} registered). The optional note below is included in the email.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <Textarea
+                                value={remindMessage}
+                                onChange={(e) => setRemindMessage(e.target.value)}
+                                placeholder="Optional note, e.g. Please log in 10 minutes early and choose your competition language."
+                                rows={3}
+                                data-testid="textarea-remind-message"
+                              />
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => remindMutation.mutate({ id: comp.id, message: remindMessage })} data-testid="button-confirm-remind">
+                                  Send reminder
+                                </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
