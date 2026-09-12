@@ -82,14 +82,22 @@ function QuestionsTab() {
     : ["tr"];
 
   const { data: book } = useQuery<CompetitionBook | null>({
-    queryKey: ["/api/admin/competitions", selectedCompetitionId, "book"],
+    // selectedLanguage is part of the key so the preview refetches when the language tab changes.
+    queryKey: ["/api/admin/competitions", selectedCompetitionId, "book", selectedLanguage],
     queryFn: async () => {
       if (!selectedCompetitionId) return null;
-      const res = await fetch(`/api/admin/competitions/${selectedCompetitionId}/book`, {
+      // Previously this never sent ?language=, so the book preview always showed
+      // whatever getCompetitionBook()'s "tr" default resolved to, regardless of
+      // which language tab was selected.
+      const res = await fetch(`/api/admin/competitions/${selectedCompetitionId}/book?language=${selectedLanguage}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       if (!res.ok) return null;
-      return res.json();
+      const book = await res.json();
+      // Only return if it actually matches our language (defends against any
+      // server-side fallback ever resurfacing here, same as books-tab.tsx).
+      if (book && (book as any).language === selectedLanguage) return book;
+      return null;
     },
     enabled: !!selectedCompetitionId,
   });

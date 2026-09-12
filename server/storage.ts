@@ -151,6 +151,7 @@ export interface IStorage {
 
   // Competition Questions
   getCompetitionQuestions(competitionId: string, language?: string): Promise<CompetitionQuestion[]>;
+  getCompetitionReadyLanguages(competitionId: string): Promise<string[]>;
   getCompetitionQuestion(id: string): Promise<CompetitionQuestion | undefined>;
   createCompetitionQuestion(data: InsertCompetitionQuestion): Promise<CompetitionQuestion>;
   updateCompetitionQuestion(id: string, data: Partial<InsertCompetitionQuestion>): Promise<CompetitionQuestion | undefined>;
@@ -913,6 +914,22 @@ export class DatabaseStorage implements IStorage {
       );
     }
     return db.select().from(competitionQuestions).where(eq(competitionQuestions.competitionId, competitionId));
+  }
+
+  // Languages that have BOTH a book AND at least one question — the only languages
+  // safe to serve to a student. Previously the book and the question lists each
+  // fell back to "first available" independently, which could pick different
+  // languages (e.g. book in Romanian, questions in Turkish) whenever a language
+  // was only partially set up. See resolveCompetitionLanguage() in routes.ts.
+  async getCompetitionReadyLanguages(competitionId: string): Promise<string[]> {
+    const books = await this.getCompetitionBooks(competitionId);
+    const bookLangs = new Set(books.map(b => b.language));
+    if (bookLangs.size === 0) return [];
+    const questionRows = await db.select({ language: competitionQuestions.language })
+      .from(competitionQuestions)
+      .where(eq(competitionQuestions.competitionId, competitionId));
+    const questionLangs = new Set(questionRows.map(r => r.language));
+    return Array.from(bookLangs).filter(l => questionLangs.has(l));
   }
 
   async getCompetitionQuestion(id: string): Promise<CompetitionQuestion | undefined> {

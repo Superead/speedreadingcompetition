@@ -129,6 +129,21 @@ interface AuthRequest extends Request {
   user?: User;
 }
 
+// Picks ONE language for both the book and the questions a student sees, so they
+// can never disagree. Previously each endpoint (dashboard/reading/questions/
+// start-reading) independently fell back to "first available book's language" —
+// since the book fallback and the question fallback ran separately, a student
+// could be shown a book in one language and questions in another whenever a
+// language was only partially set up (e.g. a book uploaded but no questions yet).
+// Returns null only if the competition has no language with both a book and a
+// question — callers should treat that as "no content available" rather than
+// guessing.
+async function resolveCompetitionLanguage(competitionId: string, preferredLang: string): Promise<string | null> {
+  const ready = await storage.getCompetitionReadyLanguages(competitionId);
+  if (ready.length === 0) return null;
+  return ready.includes(preferredLang) ? preferredLang : ready[0];
+}
+
 async function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -669,19 +684,14 @@ export async function registerRoutes(
       if (competition) {
         // Use student's preferred language or registration language
         const reg = await storage.getRegistration(competition.id, user.id);
-        studentLang = reg?.language || (user as any).preferredLanguage || "tr";
-        book = await storage.getCompetitionBook(competition.id, studentLang);
-
-        // If no book in student's language, try the first available book
-        if (!book) {
-          const allBooks = await storage.getCompetitionBooks(competition.id);
-          if (allBooks.length > 0) {
-            book = allBooks[0];
-            studentLang = book.language;
-          }
-        }
-
         submission = await storage.getCompetitionSubmission(competition.id, user.id);
+        const preferredLang = reg?.language || (user as any).preferredLanguage || "tr";
+        // If reading already started, the language is locked in on the submission —
+        // never re-resolve it (that could disagree with the book/questions already served).
+        studentLang = (submission as any)?.language
+          || (await resolveCompetitionLanguage(competition.id, preferredLang))
+          || preferredLang;
+        book = await storage.getCompetitionBook(competition.id, studentLang);
 
         // Auto-register student for the active competition (even after registration closes)
         if (!reg) {
@@ -748,19 +758,12 @@ export async function registerRoutes(
 
       if (competition) {
         const reg = await storage.getRegistration(competition.id, user.id);
-        let studentLang = reg?.language || (user as any).preferredLanguage || "tr";
-        book = await storage.getCompetitionBook(competition.id, studentLang);
-
-        // Fallback: if no book in student's language, use first available
-        if (!book) {
-          const allBooks = await storage.getCompetitionBooks(competition.id);
-          if (allBooks.length > 0) {
-            book = allBooks[0];
-            studentLang = book.language;
-          }
-        }
-
         submission = await storage.getCompetitionSubmission(competition.id, user.id);
+        const preferredLang = reg?.language || (user as any).preferredLanguage || "tr";
+        const studentLang = (submission as any)?.language
+          || (await resolveCompetitionLanguage(competition.id, preferredLang))
+          || preferredLang;
+        book = await storage.getCompetitionBook(competition.id, studentLang);
       }
 
       const settings = competition ? {
@@ -814,9 +817,14 @@ export async function registerRoutes(
 
       const readingStartAt = new Date();
 
-      // Resolve student's competition language from registration or preference
+      // Resolve student's competition language from registration or preference.
+      // If a submission already carries a language (rare, but possible), keep it —
+      // never re-resolve once a language may already be in use.
       const reg = await storage.getRegistration(competition.id, user.id);
-      const studentLang = reg?.language || (user as any).preferredLanguage || "tr";
+      const preferredLang = (submission as any)?.language || reg?.language || (user as any).preferredLanguage || "tr";
+      const studentLang = (submission as any)?.language
+        || (await resolveCompetitionLanguage(competition.id, preferredLang))
+        || preferredLang;
 
       if (submission) {
         submission = await storage.updateSubmission(submission.id, { readingStartAt, language: studentLang } as any);
@@ -884,19 +892,12 @@ export async function registerRoutes(
       }
 
       const reg = await storage.getRegistration(competition.id, user.id);
-      let studentLang = reg?.language || (user as any).preferredLanguage || "tr";
-      let questions = await storage.getCompetitionQuestions(competition.id, studentLang);
-
-      // Fallback: if no questions in student's language, try first available book's language
-      if (questions.length === 0) {
-        const allBooks = await storage.getCompetitionBooks(competition.id);
-        if (allBooks.length > 0) {
-          studentLang = allBooks[0].language;
-          questions = await storage.getCompetitionQuestions(competition.id, studentLang);
-        }
-      }
-
       const submission = await storage.getCompetitionSubmission(competition.id, user.id);
+      const preferredLang = reg?.language || (user as any).preferredLanguage || "tr";
+      const studentLang = (submission as any)?.language
+        || (await resolveCompetitionLanguage(competition.id, preferredLang))
+        || preferredLang;
+      const questions = await storage.getCompetitionQuestions(competition.id, studentLang);
 
       let userAnswers: any[] = [];
       if (submission) {
@@ -2311,8 +2312,11 @@ export async function registerRoutes(
       }
 
       const registration = await storage.getRegistration(competition.id, user.id);
-      const studentLang = registration?.language || (user as any).preferredLanguage || "tr";
       const submission = await storage.getCompetitionSubmission(competition.id, user.id);
+      const preferredLang = registration?.language || (user as any).preferredLanguage || "tr";
+      const studentLang = (submission as any)?.language
+        || (await resolveCompetitionLanguage(competition.id, preferredLang))
+        || preferredLang;
       const book = await storage.getCompetitionBook(competition.id, studentLang);
 
       res.json({
@@ -2396,7 +2400,10 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Reading already started" });
       }
 
-      const regLang = registration.language || studentLang;
+      const preferredLang = (submission as any)?.language || registration.language || studentLang;
+      const regLang = (submission as any)?.language
+        || (await resolveCompetitionLanguage(competition.id, preferredLang))
+        || preferredLang;
       submission = await storage.createSubmission({
         userId: user.id,
         competitionId: competition.id,
