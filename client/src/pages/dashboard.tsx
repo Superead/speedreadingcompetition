@@ -195,6 +195,7 @@ export default function DashboardPage() {
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/student/dashboard"],
     enabled: !!token,
+    refetchInterval: 30_000,
   });
 
   const resultsPublished = data?.settings?.resultsPublishedAt != null;
