@@ -1489,6 +1489,7 @@ export async function registerRoutes(
           readingSpeedWPM: submission.readingSpeedWPM,
           comprehensionScore: submission.comprehensionScore,
           finalScore: submission.finalScore,
+          wabaScore: (submission as any).wabaScore,
           mcqCorrectCount: submission.mcqCorrectCount,
           mcqWrongCount: submission.mcqWrongCount,
           mcqTotalCount: submission.mcqTotalCount,
