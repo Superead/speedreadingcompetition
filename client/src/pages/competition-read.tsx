@@ -216,16 +216,26 @@ export default function CompetitionReadPage() {
     localStorage.setItem("reader_fontFamily", fontFamily);
   }, [fontFamily]);
 
-  // Calculate pages using vertical pagination (scrollHeight / visible height)
+  // Highest page count measured for the current content/font/layout combo.
+  // ResizeObserver / window-resize can fire during transient layout states
+  // (e.g. right after a page-turn's CSS transition, or while dangerouslySetInnerHTML
+  // is still painting a long book) and briefly under-measure scrollHeight. If we
+  // let totalPages shrink on those transient reads, the student's "next page"
+  // button can appear to silently stop working — clamped to a totalPages that's
+  // lower than the page they're already on. We only reset this ceiling when the
+  // content, font, or layout mode actually changes (handled in the effect below).
+  const maxPagesRef = useRef(1);
+
+  // Calculate pages using vertical pagination (scrollHeight / visible height).
+  // Note: CSS transform never affects scrollHeight/offsetHeight (it's a paint/
+  // composite property, not a layout one), so there is no need to reset the
+  // page's transform before measuring — doing that previously fought with
+  // React's own style updates on the same element.
   const recalcPages = useCallback(() => {
     const doCalc = () => {
       if (!contentRef.current || !containerRef.current) return;
       const container = containerRef.current;
       const content = contentRef.current;
-
-      // Reset transform so scrollHeight reflects full content
-      content.style.transition = "none";
-      content.style.transform = "none";
 
       const rawH = container.offsetHeight;
       if (rawH === 0) return;
@@ -235,10 +245,9 @@ export default function CompetitionReadPage() {
       setPageHeight(ch);
       const sh = content.scrollHeight;
       const pages = Math.max(1, Math.ceil(sh / ch));
-      setTotalPages(pages);
-      setCurrentPage((prev) => Math.min(prev, pages));
-      // Restore transition — React will apply the correct transform on next render
-      content.style.transition = "transform 0.3s ease";
+      maxPagesRef.current = Math.max(maxPagesRef.current, pages);
+      setTotalPages(maxPagesRef.current);
+      setCurrentPage((prev) => Math.min(prev, maxPagesRef.current));
     };
 
     // Run after layout is complete — use setTimeout to ensure DOM is painted
@@ -250,6 +259,8 @@ export default function CompetitionReadPage() {
   }, [fontSize]);
 
   useEffect(() => {
+    // Content/font/layout changed — the old page ceiling no longer applies.
+    maxPagesRef.current = 1;
     recalcPages();
     // Retry a few times — content may not be laid out immediately after data arrives
     const t1 = setTimeout(recalcPages, 100);
