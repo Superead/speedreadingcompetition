@@ -1946,6 +1946,29 @@ export async function registerRoutes(
     }
   });
 
+  // Reset ONE student so they can retry from zero — rescues someone whose
+  // registration/submission was created with the wrong language (e.g. a book
+  // was uploaded in a language before its questions were, or vice versa, before
+  // the book/question language-match fix). Leaves every other student untouched.
+  app.post("/api/admin/competitions/:id/students/:userId/retry", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const competition = await storage.getCompetition(req.params.id);
+      if (!competition) return res.status(404).json({ error: "Competition not found" });
+      const { language } = req.body || {};
+      if (language) {
+        const ready = await storage.getCompetitionReadyLanguages(competition.id);
+        if (!ready.includes(language)) {
+          return res.status(400).json({ error: `No book+questions ready in "${language}" for this competition. Ready languages: ${ready.join(", ") || "none"}` });
+        }
+      }
+      const result = await storage.resetStudentSubmission(competition.id, req.params.userId, language);
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error("Reset student error:", error);
+      res.status(500).json({ error: "Failed to reset student" });
+    }
+  });
+
   // Publish competition results
   app.put("/api/admin/competitions/:id/results/publish", authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
     try {

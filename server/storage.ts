@@ -138,6 +138,7 @@ export interface IStorage {
   updateCompetition(id: string, data: Partial<InsertCompetition>): Promise<Competition | undefined>;
   deleteCompetition(id: string): Promise<void>;
   resetCompetition(id: string): Promise<{ submissionsDeleted: number }>;
+  resetStudentSubmission(competitionId: string, userId: string, correctedLanguage?: string): Promise<{ hadSubmission: boolean }>;
   publishCompetition(id: string): Promise<Competition | undefined>;
   closeCompetition(id: string): Promise<Competition | undefined>;
   publishCompetitionResults(id: string): Promise<Competition | undefined>;
@@ -831,6 +832,32 @@ export class DatabaseStorage implements IStorage {
     await db.delete(competitionRegistrations).where(eq(competitionRegistrations.competitionId, id));
 
     return { submissionsDeleted: subIds.length };
+  }
+
+  // Reset ONE student's submission + registration for a competition so they can
+  // retry from zero — used to rescue a student whose registration/submission was
+  // created with the wrong language (e.g. before the book/question language-match
+  // fix) without touching anyone else's progress. Optionally sets the corrected
+  // language on the fresh registration.
+  async resetStudentSubmission(
+    competitionId: string,
+    userId: string,
+    correctedLanguage?: string,
+  ): Promise<{ hadSubmission: boolean }> {
+    const submission = await this.getCompetitionSubmission(competitionId, userId);
+    if (submission) {
+      await db.delete(answers).where(eq(answers.submissionId, submission.id));
+      await db.delete(submissions).where(eq(submissions.id, submission.id));
+    }
+    if (correctedLanguage) {
+      await db.update(competitionRegistrations)
+        .set({ language: correctedLanguage })
+        .where(and(
+          eq(competitionRegistrations.competitionId, competitionId),
+          eq(competitionRegistrations.userId, userId),
+        ));
+    }
+    return { hadSubmission: !!submission };
   }
 
   async publishCompetition(id: string): Promise<Competition | undefined> {
