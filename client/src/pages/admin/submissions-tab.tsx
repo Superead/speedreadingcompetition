@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Eye, RefreshCw } from "lucide-react";
+import { Loader2, Eye, RefreshCw, Download } from "lucide-react";
 import type { Question, User, Submission, Category, Competition } from "@shared/schema";
 import { SUPPORTED_LANGUAGES } from "@shared/schema";
 import {
@@ -543,6 +543,8 @@ function SubmissionsTab({
     registrationId: string;
     userName: string;
     userEmail: string | null;
+    userCity: string | null;
+    userCountry: string | null;
     language: string;
     registeredAt: string | null;
     submission: Submission | null;
@@ -566,6 +568,55 @@ function SubmissionsTab({
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}m ${secs}s`;
+  };
+
+  const getStatusLabel = (s: Submission) =>
+    s.answerEndAt ? "Completed" : s.readingEndAt ? "Answering" : s.readingStartAt ? "Reading" : "Not Started";
+
+  // Download exactly the rows currently shown (respects category/competition/language filters)
+  const handleExportCSV = () => {
+    const rows = filteredSubmissions || [];
+    const headers = ["Student", "Email", "Country", "City", "Category", "Competition", "Language",
+      "Reading (s)", "Answer (s)", "MCQ Correct", "MCQ Wrong", "MCQ Total", "Auto", "Manual", "Final", "WABA", "Status"];
+    const escape = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const lines = rows.map((s: any) => [
+      s.userName,
+      s.userEmail,
+      s.userCountry,
+      s.userCity,
+      getCategoryTitle(s.category),
+      competitions?.find(c => c.id === s.competitionId)?.title,
+      s.language,
+      s.readingSeconds,
+      s.answerSeconds,
+      s.mcqCorrectCount,
+      s.mcqWrongCount,
+      s.mcqTotalCount,
+      s.autoScore,
+      s.manualScore,
+      s.finalScore,
+      s.wabaScore,
+      getStatusLabel(s),
+    ].map(escape).join(","));
+    const pendingLines = pendingRegistrations.map((r) => [
+      r.userName,
+      r.userEmail,
+      r.userCountry,
+      r.userCity,
+      getCategoryTitle(competitions?.find(c => c.id === filterCompetition)?.category || ""),
+      competitions?.find(c => c.id === filterCompetition)?.title,
+      r.language,
+      "", "", "", "", "", "", "", "", "",
+      "Registered",
+    ].map(escape).join(","));
+    // BOM so Excel shows Turkish/accented characters correctly
+    const csv = "\uFEFF" + [headers.map(escape).join(","), ...lines, ...pendingLines].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "submissions.csv";
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -626,6 +677,9 @@ function SubmissionsTab({
         <Button variant="outline" size="sm" onClick={() => refetchSubmissions()}>
           <RefreshCw className="h-4 w-4 mr-1" /> Refresh
         </Button>
+        <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={!filteredSubmissions?.length && !pendingRegistrations.length} data-testid="button-export-submissions">
+          <Download className="h-4 w-4 mr-1" /> Export CSV
+        </Button>
       </div>
 
       <Card>
@@ -638,6 +692,7 @@ function SubmissionsTab({
                   <TableHead className="w-[80px] sticky right-0 bg-background z-10">Actions</TableHead>
                   <TableHead>Student</TableHead>
                   <TableHead className="hidden md:table-cell">Email</TableHead>
+                  <TableHead>Country</TableHead>
                   <TableHead>Competition</TableHead>
                   {showLanguageFilter && <TableHead className="w-[50px]">Lang</TableHead>}
                   <TableHead className="w-[70px]">Reading</TableHead>
@@ -669,6 +724,9 @@ function SubmissionsTab({
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground">
                       {(submission as any).userEmail || "-"}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {(submission as any).userCountry || "-"}
                     </TableCell>
                     <TableCell className="text-sm">
                       {competitions?.find(c => c.id === submission.competitionId)?.title ||
@@ -726,6 +784,7 @@ function SubmissionsTab({
                     <TableCell className="sticky right-0 bg-background z-10" />
                     <TableCell className="font-medium text-foreground">{r.userName}</TableCell>
                     <TableCell className="hidden md:table-cell">{r.userEmail || "-"}</TableCell>
+                    <TableCell className="text-sm">{r.userCountry || "-"}</TableCell>
                     <TableCell className="text-sm">{competitions?.find(c => c.id === filterCompetition)?.title || "-"}</TableCell>
                     {showLanguageFilter && (
                       <TableCell className="text-sm">
